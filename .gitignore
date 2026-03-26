@@ -1,0 +1,37 @@
+# --- 1. 敏感信息 (最重要！) ---
+.env
+.env.local
+*.pyc
+__pycache__/
+auth_token.txt
+
+# --- 2. 虚拟环境 (不需要上传，别人可以用 requirements.txt 重建) ---
+venv/
+.venv/
+env/
+ENV/
+bin/
+lib/
+include/
+
+# --- 3. 数据库与本地存储 ---
+*.db
+*.sqlite3
+# 如果你用了 ChromaDB 等向量数据库，忽略它的索引数据
+data/
+chroma_db/
+langchain_chroma_db/
+memory_chroma_db/
+vector_store/
+
+# --- 4. 操作系统与编辑器 ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
+
+# --- 5. 依赖包与构建 ---
+dist/
+build/
+*.egg-info/

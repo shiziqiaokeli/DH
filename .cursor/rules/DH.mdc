@@ -1,0 +1,30 @@
+---
+alwaysApply: true
+---
+
+# 开发背景
+- 我正在开发一个名为 '多模态 AI 交互引擎' 的项目。我的目标是展示如何将 LLM（大模型）、RAG（检索增强生成）与 TTS（语音合成）整合。
+# 开发偏好
+- 回答问题时使用中文
+- 在生成代码注释时，请使用专业、简洁的中文。
+- 当涉及到语音模型（so-vits/RVC）的集成时，优先考虑流式传输（Streaming）方案，以降低首包延迟。
+- 在编写数据库 Schema 时，考虑到未来可能对接的 RAG 向量存储，保持字段的可扩展性。"
+# 技术栈约束
+- 核心框架: FastAPI (最新稳定版)
+- ORM: SQLAlchemy 2.0+ (必须使用声明式映射和 `select()` 语法)
+- 数据校验: Pydantic v2 (使用 `model_validate` 而非 `from_orm`)
+- 大模型框架: LangChain / LangGraph
+# 编码规范
+- 异步优先: 所有数据库操作、外部 API 调用（如 OpenAI/智谱 API）必须使用 `async` 和 `await`。
+- 依赖注入: FastAPI 接口必须使用 `Depends()` 处理数据库会话和业务逻辑。
+- 显式类型约束: 所有函数必须定义参数和返回值的 Type Hints。
+- 数据库模式: 使用 SQLAlchemy 的 `AsyncSession` 进行异步数据库交互。
+- 错误处理: 使用 FastAPI 统一的 `HTTPException` 返回错误，而非通用的 Exception。
+# 结构规范
+- 遵循 RESTful API 设计原则。
+- 业务逻辑必须从 Router 提取到 Service 层，保持目录结构清晰：
+  /app
+    /api      # 路由
+    /models   # SQLAlchemy 模型
+    /schemas  # Pydantic 模型
+    /services # 业务逻辑
