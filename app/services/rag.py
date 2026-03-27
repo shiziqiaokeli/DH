@@ -38,7 +38,7 @@ documents=doc_loader.load()
 doc_splitter=RecursiveCharacterTextSplitter(
     chunk_size=300, 
     chunk_overlap=30,
-    separators=["\n\n","\n","。","！","？","；","；","，",","," ",""]
+    separators=["\n\n","\n","。","！","？","；","；","，",","," ",""]#中文特化分隔符
     )
 chunks=doc_splitter.split_documents(documents)
 #初始化文本向量化工具
