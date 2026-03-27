@@ -3,11 +3,11 @@ alwaysApply: true
 ---
 
 # 开发背景
-- 我正在开发一个名为 '多模态 AI 交互引擎' 的项目。我的目标是展示如何将 LLM（大模型）、RAG（检索增强生成）与 TTS（语音合成）整合。
+- 我正在开发一个名为 '多模态 AI 交互引擎' 的项目。我的目标是展示如何将 LLM（大模型）、RAG（检索增强生成）与gpt-sovits整合。
 # 开发偏好
 - 回答问题时使用中文
 - 在生成代码注释时，请使用专业、简洁的中文。
-- 当涉及到语音模型（so-vits/RVC）的集成时，优先考虑流式传输（Streaming）方案，以降低首包延迟。
+- 当涉及到语音模型gpt-sovits的集成时，优先考虑流式传输（Streaming）方案，以降低首包延迟。
 - 在编写数据库 Schema 时，考虑到未来可能对接的 RAG 向量存储，保持字段的可扩展性。"
 # 技术栈约束
 - 核心框架: FastAPI (最新稳定版)
@@ -24,7 +24,7 @@ alwaysApply: true
 - 遵循 RESTful API 设计原则。
 - 业务逻辑必须从 Router 提取到 Service 层，保持目录结构清晰：
   /app
-    /api      # 路由
     /models   # SQLAlchemy 模型
     /schemas  # Pydantic 模型
     /services # 业务逻辑
+    /main.py  # 路由

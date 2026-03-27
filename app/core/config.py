@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     # 3. LLM 配置
     LLM_API_KEY: str
     LLM_BASE_URL: str
-    LLM_MODEL_NAME: str = "qwen-plus"
 
     # 使用 Pydantic 的 SettingsConfigDict 自动读取 .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8')
