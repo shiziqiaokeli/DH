@@ -123,8 +123,8 @@ final_chain=RunnableWithMessageHistory(
 )
 async def main():
     queries = [
-        "华东工程学院哪年成立？",
-        "那它后来改名了吗？"
+        "南京理工大学的首任院长是谁？",
+        "他是什么军衔？"
     ]
     for query in queries:
         print(f"校友提问: {query}\n")
