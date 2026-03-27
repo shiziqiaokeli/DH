@@ -38,9 +38,9 @@ documents=doc_loader.load()
 doc_splitter=RecursiveCharacterTextSplitter(
     chunk_size=300, 
     chunk_overlap=30,
-    separator=["\n\n","\n","。","！","？","；","；","，",","," ",""]
+    separators=["\n\n","\n","。","！","？","；","；","，",","," ",""]
     )
-chunks=RecursiveCharacterTextSplitter.split_documents(documents)
+chunks=doc_splitter.split_documents(documents)
 #初始化文本向量化工具
 embeddings=CustomQwenEmbeddings(
     api_key=settings.LLM_API_KEY,
@@ -123,7 +123,7 @@ final_chain=RunnableWithMessageHistory(
 )
 async def main():
     queries = [
-        "中国人民解放军炮兵工程学院哪年成立？",
+        "华东工程学院哪年成立？",
         "那它后来改名了吗？"
     ]
     for query in queries:
