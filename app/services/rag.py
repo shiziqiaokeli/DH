@@ -59,7 +59,7 @@ if os.path.exists(db_path) and os.listdir(db_path):
 else:
     db = Chroma.from_documents(
         documents=chunks,
-        embedding=embeddings,
+        embedding_function=embeddings,
         persist_directory=db_path
     )
 #通过Top-K检索参数k初始化检索器
