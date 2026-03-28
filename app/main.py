@@ -2,14 +2,11 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from app.core.schemas import ChatRequest
 # 确保你的 rag.py 路径正确，并且 final_chain 是可导入的
 from app.services.rag import final_chain, store 
 
 app = FastAPI(title="NJUST 校史助手 API")
-
-class ChatRequest(BaseModel):
-    query: str
-    session_id: str = "default_user"
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
