@@ -130,8 +130,8 @@ async def main():
         print(f"校友提问: {query}\n")
         print("资深校友正在回忆中...")
         # 注意：现在传给 astream 的input必须是一个字典 {"input": query}
-        # 同时config也是一个字典{"configurable": {"session_id": "default"}}
-        async for chunk in final_chain.astream({"input": query},config={"configurable": {"session_id": "default"}}):
+        # 同时config也是一个字典{"configurable": {"session_id": "admin"}}
+        async for chunk in final_chain.astream({"input": query},config={"configurable": {"session_id": "admin"}}):
             if "answer" in chunk:
                 print(chunk["answer"], end="", flush=True)
         print("\n\n---回答结束---")
