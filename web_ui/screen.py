@@ -26,8 +26,8 @@ async def text_text_chat(message, history):
                 yield partial_message
 #搭建一个demo容器
 with gr.Blocks(title="南理工校友助手") as demo:
-    #表示二级标题
-    gr.Markdown("##南京理工大学校史智能助手")
+    #表示二级标题（中间要有空格）
+    gr.Markdown("## 南京理工大学校史智能助手")
     #全自动聊天机器人
     #输入框
     #展示区：显示历史聊天记录
