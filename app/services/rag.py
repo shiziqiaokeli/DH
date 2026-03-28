@@ -121,6 +121,7 @@ final_chain=RunnableWithMessageHistory(
     history_messages_key="chat_history", 
     output_messages_key="answer",       
 )
+'''
 async def main():
     queries = [
         "南京理工大学的首任院长是谁？",
@@ -138,3 +139,16 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+'''
+class RAGService:
+    def __init__(self):
+        # 将你的初始化逻辑（embeddings, db, chain）放进来
+        self.chain = final_chain 
+
+    async def chat(self, query: str, session_id: str):
+        async for chunk in self.chain.astream(
+            {"input": query},
+            config={"configurable": {"session_id": session_id}}
+        ):
+            if "answer" in chunk:
+                yield chunk["answer"]
