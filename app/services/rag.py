@@ -121,6 +121,21 @@ final_chain=RunnableWithMessageHistory(
     history_messages_key="chat_history", 
     output_messages_key="answer",       
 )
+#为了让FastAPI能够直接调用，需要把final_chain封装起来
+class RAGService:
+    #初始化，将final_chain赋值给self.chain
+    def __init__(self):
+        self.chain = final_chain 
+    #异步生成器
+    async def chat(self, query: str, session_id: str):
+        #遍历大模型吐出的数据块
+        async for chunk in self.chain.astream(
+            {"input": query},
+            config={"configurable": {"session_id": session_id}}
+        ):
+            #找到带有answer标签的推送到调用端
+            if "answer" in chunk:
+                yield chunk["answer"]
 '''#测试代码
 async def main():
     queries = [
@@ -131,8 +146,8 @@ async def main():
         print(f"校友提问: {query}\n")
         print("资深校友正在回忆中...")
         # 注意：现在传给 astream 的input必须是一个字典 {"input": query}
-        # 同时config也是一个字典{"configurable": {"session_id": "admin"}}
-        async for chunk in final_chain.astream({"input": query},config={"configurable": {"session_id": "admin"}}):
+        # 同时config也是一个字典{"configurable": {"session_id": "session_id"}}
+        async for chunk in final_chain.astream({"input": query},config={"configurable": {"session_id": "session_id"}}):
             if "answer" in chunk:
                 print(chunk["answer"], end="", flush=True)
         print("\n\n---回答结束---")
@@ -140,15 +155,3 @@ if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
 '''
-class RAGService:
-    def __init__(self):
-        # 将你的初始化逻辑（embeddings, db, chain）放进来
-        self.chain = final_chain 
-
-    async def chat(self, query: str, session_id: str):
-        async for chunk in self.chain.astream(
-            {"input": query},
-            config={"configurable": {"session_id": session_id}}
-        ):
-            if "answer" in chunk:
-                yield chunk["answer"]

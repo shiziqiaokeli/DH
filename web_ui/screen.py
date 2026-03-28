@@ -1,31 +1,40 @@
+#导入gradio库
 import gradio as gr
+#使用httpx进行异步流式请求
 import httpx
-import asyncio
 
-async def predict(message, history):
-    # 后端地址
+#文本-文本聊天函数函数
+async def text_text_chat(message, history):
+    #后端地址
     url = "http://127.0.0.1:8000/chat"
+    #定义请求体
     payload = {
         "query": message,
-        "session_id": "gradio_user" # 实际开发可以动态生成
+        "session_id": "user123" 
     }
-    
+    #定义一个空字符串用于存储部分消息
     partial_message = ""
-    # 使用 httpx 进行异步流式请求
+    #创建一个进入时自动打开退出时自动关闭且服务器60s未响应就自动关闭的异步客户端
     async with httpx.AsyncClient(timeout=60.0) as client:
+        #发送POST请求（参数为url、请求体自动转译为json格式），并流式获取响应
         async with client.stream("POST", url, json=payload) as response:
+            #遍历响应中的文本块
             async for chunk in response.aiter_text():
+                #将部分消息拼接到partial_message中
                 partial_message += chunk
+                #视觉上流式输出，实际上迭代一个不停变长的字符串
                 yield partial_message
-
-# 使用 Gradio 原生的 ChatInterface
+#搭建一个demo容器
 with gr.Blocks(title="南理工校友助手") as demo:
-    gr.Markdown("## 🛡️ 南京理工大学校史智能助手")
+    #表示二级标题
+    gr.Markdown("##南京理工大学校史智能助手")
+    #全自动聊天机器人
+    #输入框
+    #展示区：显示历史聊天记录
+    #发送按钮
+    #逻辑：点击发送按钮后，把输入框的内容传给fn的第一个参数，同时把聊天历史传给fn的第二个参数
     gr.ChatInterface(
-        fn=predict,
-        examples=["华东工程学院哪年成立？", "那它后来改名了吗？"]
-        # 如果你想自定义按钮文字，最新版通常在组件初始化后修改，
-        # 初学者建议先删掉自定义按钮参数，跑通流程。
+        fn=text_text_chat
         )
 
 if __name__ == "__main__":
