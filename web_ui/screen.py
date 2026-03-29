@@ -45,7 +45,7 @@ with gr.Blocks(title="南理工校友助手") as demo:
     gr.ChatInterface(
         fn=text_text_chat,
         additional_inputs=[session_state]
-        #自带的clear能直接物理删除Redis缓存
+        #自带的clear不能直接物理删除Redis缓存，只是删除前端显示的聊天记录，同时会刷新页面，导致id变化，所以记忆会消失
         )
 
 if __name__ == "__main__":
