@@ -2,15 +2,23 @@
 import gradio as gr
 #使用httpx进行异步流式请求
 import httpx
+#生成随机字符串作为session_id
+import uuid
 
 #文本-文本聊天函数函数
-async def text_text_chat(message, history):
+async def text_text_chat(message, history, session_state):
+    #刚打开页面或者新开一个对话时
+    if len(history) == 0:
+        #生成一个全新的session_id
+        session_state["session_id"] = str(uuid.uuid4())
+    #获取当前的session_id
+    current_id = session_state["session_id"]
     #后端地址
     url = "http://127.0.0.1:8000/chat"
     #定义请求体
     payload = {
         "query": message,
-        "session_id": "user123" 
+        "session_id": current_id
     }
     #定义一个空字符串用于存储部分消息
     partial_message = ""
@@ -28,13 +36,16 @@ async def text_text_chat(message, history):
 with gr.Blocks(title="南理工校友助手") as demo:
     #表示二级标题（中间要有空格）
     gr.Markdown("## 南京理工大学校史智能助手")
+    session_state = gr.State(value=lambda: {"session_id": str(uuid.uuid4())})
     #全自动聊天机器人
     #输入框
     #展示区：显示历史聊天记录
     #发送按钮
-    #逻辑：点击发送按钮后，把输入框的内容传给fn的第一个参数，同时把聊天历史传给fn的第二个参数
+    #逻辑：点击发送按钮后，把输入框的内容传给fn的第一个参数，同时把聊天历史传给fn的第二个参数，最后把session_state传给fn的第三个参数
     gr.ChatInterface(
-        fn=text_text_chat
+        fn=text_text_chat,
+        additional_inputs=[session_state]
+        #自带的clear能直接物理删除Redis缓存
         )
 
 if __name__ == "__main__":
