@@ -10,6 +10,7 @@ from app.core.custom_embed import CustomQwenEmbeddings
 from app.core.config import settings
 #文本向量化后存入向量数据库
 import os
+from app.core.config import settings
 from langchain_chroma import Chroma
 #初始化大模型
 from langchain_openai import ChatOpenAI
@@ -50,7 +51,7 @@ embeddings=CustomQwenEmbeddings(
     model="text-embedding-v1"
     )
 #获取向量数据库路径
-db_path = "./chroma_db"
+db_path = settings.VECTOR_DB_PATH
 #如果向量数据库存在且不为空，则加载向量数据库
 if os.path.exists(db_path) and os.listdir(db_path):
     db = Chroma(
@@ -95,7 +96,7 @@ history_aware_retriever = create_history_aware_retriever(
 qa_system_prompt="""你是一名知识渊博的南京理工大学（NJUST）资深校友。请根据提供的【校史参考资料】来回答【校友提问】。
 要求：
 1. 仅根据资料内容回答，不要胡编乱造。
-2. 如果资料中没提到相关信息，请礼貌地回答：“抱歉，这段校史我还需要再查证一下。”
+2. 如果资料中没提到相关信息，请尝试根据你已有的知识回答，并注明‘根据通用知识补充’。
 3. 回答语气要严谨
 4. 回答要简洁明了，不要过于冗长，不要回答问题以外的内容。
 【校史参考资料】：{context}"""

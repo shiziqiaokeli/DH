@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     REDIS_DB: int
 
     # 5. 向量数据库配置
-
+    VECTOR_DB_PATH: str 
 
 
     # 使用 Pydantic 的 SettingsConfigDict 自动读取 .env
