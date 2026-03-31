@@ -21,7 +21,8 @@ async def text_text_chat(request: ChatRequest):
     #给生成器传入请求的query和session_id
     async def generate():
         async for chunk in rag_service.chat(request.query, session_id=request.session_id):
-            yield chunk            
+            if chunk:
+                yield chunk           
     #SSE响应格式，流式输出
     return StreamingResponse(generate(), media_type="text/event-stream")
 #实例化Redis客户端
