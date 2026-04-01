@@ -5,7 +5,7 @@ import httpx
 #生成随机字符串作为session_id
 import uuid
 
-#当用户点击发送时
+#提交函数
 def user_submit(user_message, history):
     # 将 history 视为字典列表
     if history is None:
@@ -15,14 +15,25 @@ def user_submit(user_message, history):
     # 添加一个空的助手占位符（新版中助手内容不能为空，可以给个空字符串）
     history.append({"role": "assistant", "content": ""})
     return "", history
+#(物理)删除函数
+async def delete_current_chat(session_state):
+    #获取当前会话id
+    sid = session_state["session_id"]
+    try:
+        #创建一个异步客户端
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            #发送POST请求（参数为url、请求体自动转译为json格式）
+            await client.post(
+                "http://127.0.0.1:8000/delete",
+                json={"query": "", "session_id": sid},
+            )
+    except httpx.ConnectError:
+        pass
+    return []  # 清空 chatbot 的显示
 #文本-文本聊天函数函数
 async def text_text_chat(history, session_state):
     #获取刚刚user_submit追加的最后一条消息中的用户输入
     user_message = history[-2]["content"]
-    #如果历史记录只有刚刚添加的这一条，说明是新对话
-    if len(history) <= 2:
-        #生成一个全新的session_id
-        session_state["session_id"] = str(uuid.uuid4())
     #获取当前的session_id
     current_id = session_state["session_id"]
     #后端地址
@@ -191,7 +202,12 @@ custom_css = """
 #自带的clear不能直接物理删除Redis缓存，只是删除前端显示的聊天记录，同时会刷新页面，导致id变化，所以记忆会消失
 with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
     #用于记录当前对话的session_id
-    session_state = gr.State(value=lambda: {"session_id": str(uuid.uuid4())})
+    browser_id = gr.BrowserState(
+        default_value={"session_id": None},
+        storage_key="dh_chat_session",
+        secret="bondageoflife",
+        )
+    session_state = gr.State(value={"session_id": None})
     more_menu_open = gr.State(value=False)
     with gr.Row():#分左右
         with gr.Column(scale=1, elem_id="leftside") as sidebar_col:#（左侧）分上下
@@ -219,10 +235,10 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                         with gr.Column(
                             elem_id="more-menu-dropdown", visible=False
                         ) as more_dropdown:
-                            more_opt_a = gr.Button(
+                            rename_btn = gr.Button(
                                 "重命名", variant="secondary", size="lg", elem_id="mini-btn"
                             )
-                            more_opt_b = gr.Button(
+                            delete_btn = gr.Button(
                                 "删除", variant="secondary", size="lg", elem_id="mini-btn"
                             )
             with gr.Column(elem_id="center-container"):#右下设计
@@ -252,7 +268,33 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                             change_model_btn = gr.Button("change_model", size="lg",variant="secondary",elem_id="mini-btn")
                             with gr.Row(elem_classes="nav-item nav-right"): 
                                 switch_btn = gr.Button("switch", size="lg",variant="secondary",elem_id="mini-btn")
-                            submit_btn = gr.Button("🚀", size="lg",variant="primary",elem_id="mini-btn")               
+                            submit_btn = gr.Button("🚀", size="lg",variant="primary",elem_id="mini-btn") 
+    #加载上一次会话的函数
+    async def on_page_load(browser_data, session_state): 
+        data = dict(browser_data) if browser_data else {}
+        cid = data.get("session_id")
+        if not cid:
+            cid = str(uuid.uuid4())
+            data["session_id"] = cid
+        session_state = dict(session_state) if session_state else {}
+        session_state["session_id"] = cid
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                r = await client.get(f"http://127.0.0.1:8000/history/{cid}")
+                if r.status_code == 200:
+                    history = r.json()
+                else:
+                    history = []
+        except httpx.ConnectError:
+            history = []
+        return history, session_state, data
+
+    demo.load(
+        on_page_load,
+        inputs=[browser_id, session_state],
+        outputs=[chatbot, session_state, browser_id]
+    )        
+                   
     msg_input.submit(
         fn=user_submit,
         inputs=[msg_input, chatbot],
@@ -277,17 +319,32 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
     def toggle_more_menu(is_open: bool):
         new_open = not is_open
         return new_open, gr.update(visible=new_open)
-
     more_btn.click(
         fn=toggle_more_menu,
         inputs=[more_menu_open],
         outputs=[more_menu_open, more_dropdown],
         queue=False,
     )
+    delete_btn.click(
+        fn=delete_current_chat,
+        inputs=[session_state],
+        outputs=[chatbot],
+        queue=False,
+    )
 
-    def reset_chat():
-        return [], {"session_id": str(uuid.uuid4())}
-    new_chat_btn.click(fn=reset_chat, inputs=[], outputs=[chatbot, session_state], queue=False)
+
+    def reset_chat(browser_data):
+        data = dict(browser_data) if browser_data else {}
+        cid = str(uuid.uuid4())
+        data["session_id"] = cid
+        return [], {"session_id": cid}, data
+
+    new_chat_btn.click(
+        fn=reset_chat,
+        inputs=[browser_id],
+        outputs=[chatbot, session_state, browser_id],
+        queue=False,
+    )
 
 if __name__ == "__main__":
     demo.launch(

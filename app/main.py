@@ -10,6 +10,9 @@ from fastapi.responses import StreamingResponse
 from redis import asyncio as aioredis
 #导入配置文件
 from app.core.config import settings
+#导入获取会话历史函数
+from app.services.rag import get_session_history
+from langchain_core.messages import HumanMessage, AIMessage
 
 #实例化FastAPI对象
 app = FastAPI()
@@ -28,15 +31,23 @@ async def text_text_chat(request: ChatRequest):
 #实例化Redis客户端
 redis_client = aioredis.from_url(settings.REDIS_URL)
 #定义清除历史记录接口
-@app.post("/clear")
+@app.post("/delete")
 async def clear_history(request: ChatRequest):
     #删除对应session_id的会话历史
-    result = await redis_client.delete(request.session_id)
-    #如果删除成功，返回成功消息
-    if result > 0:
-        return {"status": "success", "message": f"History for {request.session_id} cleared"}
-    else:
-        return {"status": "not_found", "message": "No history found for this session"}
+    h = get_session_history(request.session_id)
+    await h.clear()
+#定义获取会话历史接口
+@app.get("/history/{session_id}")
+async def get_chat_history(session_id: str):
+    history_store = rag_service.get_history(session_id)  
+    messages = history_store.messages
+    out = []
+    for m in messages:
+        if isinstance(m, HumanMessage):
+            out.append({"role": "user", "content": m.content})
+        elif isinstance(m, AIMessage):
+            out.append({"role": "assistant", "content": m.content})
+    return out
 
 if __name__ == "__main__":
     import uvicorn

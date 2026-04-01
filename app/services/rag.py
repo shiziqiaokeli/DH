@@ -116,8 +116,7 @@ redis_url=settings.REDIS_URL
 def get_session_history(session_id: str):
     return RedisChatMessageHistory(
         session_id=session_id,
-        url=redis_url,
-        ttl=60*60*24#24小时过期,自动清理冷数据
+        url=redis_url
     )
 '''#由store字典升级为Redis缓存
 #全局字典，用于存储会话历史
@@ -141,6 +140,9 @@ class RAGService:
     #初始化，将final_chain赋值给self.chain
     def __init__(self):
         self.chain = final_chain 
+    #获取会话历史
+    def get_history(self, session_id: str) -> BaseChatMessageHistory:
+        return get_session_history(session_id)
     #异步生成器
     async def chat(self, query: str, session_id: str):
         #遍历大模型吐出的数据块
