@@ -163,13 +163,36 @@ custom_css = """
     padding: 10px 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
+/*more下拉锚点：只占按钮宽度，供子菜单absolute参照*/
+#more-menu-anchor {
+    position: relative !important;
+    width: fit-content !important;
+    flex: 0 0 auto !important;
+    align-self: center;
+    min-width: 0 !important;
+}
+/*悬浮在按钮下方，不撑开顶栏Row*/
+#more-menu-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    margin-top: 6px !important;
+    z-index: 1001 !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: max-content !important;
+    min-width: 140px;
+    padding: 8px !important;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
 """
 #自带的clear不能直接物理删除Redis缓存，只是删除前端显示的聊天记录，同时会刷新页面，导致id变化，所以记忆会消失
-refresh_btn = gr.Button("Refresh", variant="secondary", size="sm")
-clear_btn = gr.Button("Clear", variant="secondary", size="sm")
 with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
     #用于记录当前对话的session_id
     session_state = gr.State(value=lambda: {"session_id": str(uuid.uuid4())})
+    more_menu_open = gr.State(value=False)
     with gr.Row():#分左右
         with gr.Column(scale=1, elem_id="leftside") as sidebar_col:#（左侧）分上下
             with gr.Column(scale=1):#左上设计
@@ -189,7 +212,19 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                 string2
                 </div>""")
                 with gr.Row(elem_classes="nav-item nav-right"): 
-                    more_btn = gr.Button("more", variant="secondary", size="lg", elem_id="mini-btn")
+                    with gr.Column(elem_id="more-menu-anchor"):
+                        more_btn = gr.Button(
+                            "more", variant="secondary", size="lg", elem_id="mini-btn"
+                        )
+                        with gr.Column(
+                            elem_id="more-menu-dropdown", visible=False
+                        ) as more_dropdown:
+                            more_opt_a = gr.Button(
+                                "重命名", variant="secondary", size="lg", elem_id="mini-btn"
+                            )
+                            more_opt_b = gr.Button(
+                                "删除", variant="secondary", size="lg", elem_id="mini-btn"
+                            )
             with gr.Column(elem_id="center-container"):#右下设计
                 #聊天显示区
                 chatbot = gr.Chatbot(
@@ -213,6 +248,7 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                         #工具栏左右对齐
                         with gr.Row():
                             change_rag_btn = gr.Button("change_rag", size="lg",variant="secondary",elem_id="mini-btn")
+                            change_prompt_btn = gr.Button("change_prompt", size="lg",variant="secondary",elem_id="mini-btn")
                             change_model_btn = gr.Button("change_model", size="lg",variant="secondary",elem_id="mini-btn")
                             with gr.Row(elem_classes="nav-item nav-right"): 
                                 switch_btn = gr.Button("switch", size="lg",variant="secondary",elem_id="mini-btn")
@@ -236,6 +272,17 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         fn=text_text_chat,
         inputs=[chatbot, session_state],
         outputs=[chatbot]
+    )
+
+    def toggle_more_menu(is_open: bool):
+        new_open = not is_open
+        return new_open, gr.update(visible=new_open)
+
+    more_btn.click(
+        fn=toggle_more_menu,
+        inputs=[more_menu_open],
+        outputs=[more_menu_open, more_dropdown],
+        queue=False,
     )
 
     def reset_chat():
