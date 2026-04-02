@@ -1,0 +1,173 @@
+/*强制容器占满全宽，并去除内边距*/
+.gradio-container { 
+    max-width: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+}
+/*移除内部主布局的默认间距*/
+.main {
+    padding: 0 !important;
+}
+/*左侧框架：浅灰色背景，无边框*/
+#leftside {
+    background-color: #f0f4f9; 
+    padding: 20px 15px;
+    height: 100vh;
+}
+/*右侧框架：设为相对定位，方便内部绝对定位*/
+#rightside {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+/*顶部悬浮导航*/
+#top-nav {
+    position: absolute;
+    top: 15px;
+    left: 0;
+    width: 100%;             /*必须撑满宽度，space-between 才会生效*/
+    padding: 0 20px;         /*左右留出安全边距*/
+    display: flex;
+    justify-content: space-between; /*关键：分散对齐*/
+    align-items: center;     /*垂直居中*/
+    z-index: 1000;
+    box-sizing: border-box;  /*确保 padding 不会撑破宽度*/
+}
+/*统一子项宽度，确保中间内容真正处于物理中心*/
+.nav-item {
+    flex: 1; 
+}
+.nav-center {
+    text-align: center;
+}
+.nav-right {
+    display: flex;
+    justify-content: flex-end; /*将按钮推向最右侧*/
+}
+#mini-btn {
+    /*取消自动撑满*/
+    flex: 0 0 auto !important; 
+    width: fit-content !important; 
+    min-width: 0 !important;
+    /*压缩内边距：让边框紧贴文字*/
+    padding: 2px 10px !important; 
+    /*如果是在Row/Column内部，防止它被拉伸*/
+    align-self: center; 
+}
+/*居中且变窄的限制容器*/
+#center-container {
+    max-width: 850px; /*控制聊天和输入框的最大宽度*/
+    margin: 0 auto;   /*水平居中*/
+    height: 100vh;
+    display: block;
+    position: relative; /*为悬浮输入框提供参照*/
+}
+/*聊天框占满高度，沉入底层*/
+#chat-window {
+    height: 100% !important;
+    padding-top: 80px !important; 
+    /*底部留出大片空白！这样哪怕输入框挡在上面，用户也能把最后一条消息滚动出来*/
+    padding-bottom: 200px !important; 
+    border: none !important;
+    background: transparent !important;
+}
+/*绝对定位的悬浮输入区域*/
+#input-wrapper {
+    position: absolute;
+    bottom: 25px; /*距离底部25px固定*/
+    left: 0;
+    width: 100%;
+    z-index: 999; /*浮在聊天记录之上*/
+}
+/*类似Gemini的输入*/
+#input-card {
+    background-color: #f0f4f9;
+    border-radius: 24px;
+    padding: 10px 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+/*more下拉锚点：只占按钮宽度，供子菜单absolute参照*/
+#more-menu-anchor {
+    position: relative !important;
+    width: fit-content !important;
+    flex: 0 0 auto !important;
+    align-self: center;
+    min-width: 0 !important;
+}
+/*悬浮在按钮下方，不撑开顶栏Row*/
+#more-menu-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    margin-top: 6px !important;
+    z-index: 1001 !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: max-content !important;
+    min-width: 140px;
+    padding: 8px !important;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+/* 重命名弹窗遮罩层 */
+#rename-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+#rename-overlay > div {
+    flex: 0 0 auto !important;
+    align-self: center !important;
+    min-height: 0 !important;
+    height: auto !important;
+}
+/* 重命名弹窗卡片 */
+#rename-card {
+    background: #ffffff !important;
+    border-radius: 16px !important;
+    padding: 24px 32px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    width: 400px !important;
+    max-width: 90vw !important;
+    flex: 0 0 auto !important;
+    max-height: 90vh !important;
+}
+/* 弹窗标题 */
+#rename-title {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin-bottom: 16px !important;
+    text-align: center !important;
+    color: #1a1a1a !important;
+}
+/* 弹窗输入框 */
+#rename-input input {
+    font-size: 14px !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    border: 1px solid #d1d5db !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-bottom: 20px !important;
+}
+/* 弹窗按钮容器 */
+#rename-buttons {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 12px !important;
+}
+/* 弹窗按钮统一尺寸 */
+.rename-btn {
+    flex: 0 0 auto !important;
+    min-width: 80px !important;
+    padding: 8px 20px !important;
+}
