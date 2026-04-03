@@ -31,6 +31,15 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         with gr.Column(scale=1, elem_id="leftside") as sidebar_col:#（左侧）分上下
             with gr.Column(scale=1):#左上设计
                 new_chat_btn = gr.Button("📝发起新对话", variant="primary", size="lg")
+                new_rag_btn = gr.UploadButton(
+                    "新建知识库",  
+                    variant="secondary",
+                    size="lg",
+                    file_count="single", 
+                    file_types=[".txt",] 
+                )
+                new_prompt_btn = gr.Button("新建提示词", variant="secondary", size="lg")
+                new_model_btn = gr.Button("训练模型", variant="secondary", size="lg")
                 gr.Markdown("""<div style="font-size: 16px; font-weight: 600; padding: 0;text-align: center;">
                 对话
                 </div>""")
@@ -42,7 +51,7 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                     )
                 
             with gr.Column(scale=0):#左下设计
-                rag_model_btn=gr.Button("管理知识库和模型", variant="secondary", size="lg")
+                rag_model_btn=gr.Button(" ⚙️ 设 置 ", variant="secondary", size="lg")
         with gr.Column(scale=5, elem_id="rightside"):#（右侧）分上下
             with gr.Row(elem_id="top-nav"):#右上设计
                 gr.Markdown("""<div class="nav-item" style="font-size: 16px; font-weight: 600; padding: 0;text-align: left;">
@@ -105,7 +114,8 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                             change_temperature_btn = gr.Button("t", size="lg",variant="secondary",elem_id="mini-btn")
                             change_model_btn = gr.Button("model", size="lg",variant="secondary",elem_id="mini-btn")
                             with gr.Row(elem_classes="nav-item nav-right"): 
-                                switch_btn = gr.Button("✉️/🎙️", size="lg",variant="secondary",elem_id="mini-btn") 
+                                switch_btn = gr.Button("文本/语音输出", size="lg",variant="secondary",elem_id="mini-btn") 
+                            audio_submit_btn = gr.Button("🎙️", size="lg",variant="primary",elem_id="mini-btn") 
                             submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn") 
     
     demo.load(
