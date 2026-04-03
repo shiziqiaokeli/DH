@@ -97,7 +97,7 @@ def _build_chain(collection_name: str, qa_system_prompt: str, temperature: float
         embedding_function=embeddings,
         persist_directory=db_path,
     )
-    retriever = db.as_retriever(search_kwargs={"k": 100})
+    retriever = db.as_retriever(search_kwargs={"k": 30})
     #构建有记忆的检索器（水龙头）
     history_aware_retriever = create_history_aware_retriever(
         llm, retriever, transform_prompt
