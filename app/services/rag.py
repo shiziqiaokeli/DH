@@ -1,5 +1,7 @@
 #用于获得传入私有知识库资料的路径
 from pathlib import Path
+import asyncio
+import uuid
 #通过路径和编码方式初始化加载器，调用加载器的load方法获取资料
 from langchain_community.document_loaders import TextLoader
 #通过块大小，重叠大小，分隔符初始化分割器，调用分割器的split_documents方法分割资料
@@ -30,50 +32,23 @@ from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 #将rag_chain包装成可运行的chain，并且自动添加会话历史
 from langchain_core.runnables import RunnableWithMessageHistory
+from langchain_huggingface import HuggingFaceEmbeddings
 
-#用于获得传入私有知识库资料的路径
-directory=Path(__file__).resolve().parent.parent.parent
-path=directory / "data" / "njust_info.txt"
-#通过路径和编码方式初始化加载器，调用加载器的load方法获取资料
-doc_loader=TextLoader(path,encoding="utf-8")
-documents=doc_loader.load()
-#通过块大小，重叠大小，分隔符初始化分割器，调用分割器的split_documents方法分割资料
-doc_splitter=RecursiveCharacterTextSplitter(
-    chunk_size=300, 
-    chunk_overlap=30,
-    separators=["\n\n","\n","。","！","？","；","；","，",","," ",""]#中文特化分隔符
-    )
-chunks=doc_splitter.split_documents(documents)
-#初始化文本向量化工具
-embeddings=CustomQwenEmbeddings(
-    api_key=settings.LLM_API_KEY,
-    base_url=settings.LLM_BASE_URL,
-    model="text-embedding-v1"
-    )
+embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")
 #获取向量数据库路径
 db_path = settings.VECTOR_DB_PATH
-#如果向量数据库存在且不为空，则加载向量数据库
-if os.path.exists(db_path) and os.listdir(db_path):
-    db = Chroma(
-        embedding_function=embeddings,
-        persist_directory=db_path
-    )
-#如果向量数据库不存在或者为空，则创建向量数据库
-else:
-    db = Chroma.from_documents(
-        documents=chunks,
-        embedding_function=embeddings,
-        persist_directory=db_path
-    )
-#通过Top-K检索参数k初始化检索器
-retriever=db.as_retriever(search_kwargs={"k": 3})
+
+_chain_cache: dict[str, RunnableWithMessageHistory] = {}
+
 #初始化大模型
-llm=ChatOpenAI(
-    api_key=settings.LLM_API_KEY,
-    base_url=settings.LLM_BASE_URL,
-    model="qwen3.5-flash",
-    temperature=0.1,#温度参数用于平衡模型的创造力和确定性
-    streaming=True#控制模型流式传输
+def _make_llm(temperature: float) -> ChatOpenAI:
+    """按 system_settings.t_value 构建 LLM。"""
+    return ChatOpenAI(
+        api_key=settings.LLM_API_KEY,
+        base_url=settings.LLM_BASE_URL,
+        model="qwen3.5-flash",
+        temperature=temperature,
+        streaming=True,
     )
 #构建转化问题所用的系统提示词
 transform_system_prompt=(
@@ -87,29 +62,7 @@ transform_prompt = ChatPromptTemplate.from_messages([
     ("system", transform_system_prompt),#系统提示词
     MessagesPlaceholder("chat_history"),#记忆区，0轮时为空，每一轮对话后会自动添加到记忆区
     ("human", "{input}"),#用户问题
-])
-#构建有记忆的检索器（水龙头）
-history_aware_retriever = create_history_aware_retriever(
-    llm, retriever, transform_prompt
-)#把transform_prompt喂给llm得到转化后的问题，把转化后的问题通过retriever先向量化再检索出相似度最高的k个资料传给下一个chain
-#构建回答问题所用的系统提示词
-qa_system_prompt="""你是一名知识渊博的南京理工大学（NJUST）资深校友。请根据提供的【校史参考资料】来回答【校友提问】。
-要求：
-1. 仅根据资料内容回答，不要胡编乱造。
-2. 如果资料中没提到相关信息，请尝试根据你已有的知识回答，并注明‘根据通用知识补充’。
-3. 回答语气要严谨
-4. 回答要简洁明了，不要过于冗长，不要回答问题以外的内容。
-【校史参考资料】：{context}"""
-#把系统提示词，记忆区，用户问题拼接起来
-qa_prompt = ChatPromptTemplate.from_messages([
-    ("system", qa_system_prompt),
-    MessagesPlaceholder("chat_history"),
-    ("human", "{input}"),
-])
-#接受前面所有chain的输出作为context（排水口），赋值给qa_prompt，然后调用llm回答问题
-question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
-#规定两个chain的协议（水管）
-rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+])#把transform_prompt喂给llm得到转化后的问题，把转化后的问题通过retriever先向量化再检索出相似度最高的k个资料传给下一个chain
 #获得Redis的URL
 redis_url=settings.REDIS_URL
 #根据session_id获取会话历史
@@ -118,57 +71,92 @@ def get_session_history(session_id: str):
         session_id=session_id,
         url=redis_url
     )
-'''#由store字典升级为Redis缓存
-#全局字典，用于存储会话历史
-store={}
-#如果没有会话id，则创建一个会话历史，否则返回对应的会话历史
-def get_session_history(session_id: str) -> BaseChatMessageHistory:
-    if session_id not in store:
-        store[session_id] = ChatMessageHistory()
-    return store[session_id]
-'''
-#将rag_chain包装成可运行的chain，并且自动添加会话历史
-final_chain=RunnableWithMessageHistory(
-    rag_chain,
-    get_session_history,#用于管理会话历史
-    input_messages_key="input",          
-    history_messages_key="chat_history", 
-    output_messages_key="answer",       
-)
+
+async def process_uploaded_file(file_path: str) -> str:
+    loader = TextLoader(file_path, encoding="utf-8")
+    documents = loader.load()
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=300, chunk_overlap=30,
+        separators=["\n\n", "\n", "。", "！", "？", "；", "，", ",", " ", ""]
+    )
+    chunks = splitter.split_documents(documents)
+    collection_name = f"kb_{uuid.uuid4().hex[:12]}"   # 后端自动生成
+    db = Chroma(
+        collection_name=collection_name,
+        embedding_function=embeddings,
+        persist_directory=db_path,
+    )
+    await asyncio.to_thread(db.add_documents, chunks)
+    return collection_name   # 返回给调用方，让它存进 MySQL
+
+def _build_chain(collection_name: str, qa_system_prompt: str, temperature: float) -> RunnableWithMessageHistory:
+    llm = _make_llm(temperature)
+    """按 collection_name 构建一条完整 chain"""
+    db = Chroma(
+        collection_name=collection_name,
+        embedding_function=embeddings,
+        persist_directory=db_path,
+    )
+    retriever = db.as_retriever(search_kwargs={"k": 100})
+    #构建有记忆的检索器（水龙头）
+    history_aware_retriever = create_history_aware_retriever(
+        llm, retriever, transform_prompt
+    )
+    #构建回答问题所用的系统提示词
+    #把系统提示词，记忆区，用户问题拼接起来
+    qa_prompt = ChatPromptTemplate.from_messages([
+        ("system", qa_system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ])
+    #接受前面所有chain的输出作为context（排水口），赋值给qa_prompt，然后调用llm回答问题
+    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+    #规定两个chain的协议（水管）
+    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+    #将rag_chain包装成可运行的chain，并且自动添加会话历史
+    return RunnableWithMessageHistory(
+        rag_chain,
+        get_session_history,
+        input_messages_key="input",
+        history_messages_key="chat_history",
+        output_messages_key="answer",
+    )
+
+def _chain_key(collection_name: str, prompt_id: int, temperature: float) -> str:
+    return f"{collection_name}::p{prompt_id}::t{temperature}"
+
+def get_chain(collection_name: str,qa_system_prompt: str, prompt_id: int, temperature: float) -> RunnableWithMessageHistory:
+    key = _chain_key(collection_name, prompt_id, temperature)
+    if key not in _chain_cache:
+        _chain_cache[key] = _build_chain(collection_name, qa_system_prompt, temperature)
+    return _chain_cache[key]
 #为了让FastAPI能够直接调用，需要把final_chain封装起来
 class RAGService:
-    #初始化，将final_chain赋值给self.chain
-    def __init__(self):
-        self.chain = final_chain 
     #获取会话历史
     def get_history(self, session_id: str) -> BaseChatMessageHistory:
         return get_session_history(session_id)
     #异步生成器
-    async def chat(self, query: str, session_id: str):
+    async def chat(
+        self, 
+        query: str, 
+        session_id: str, 
+        collection_name: str, 
+        qa_system_prompt: str, 
+        prompt_id: int, 
+        temperature: float,
+        is_voice_mode: bool,
+        ):
+        chain = get_chain(
+            collection_name, 
+            qa_system_prompt,
+            prompt_id,
+            temperature,
+            )
         #遍历大模型吐出的数据块
-        async for chunk in self.chain.astream(
+        async for chunk in chain.astream(
             {"input": query},
             config={"configurable": {"session_id": session_id}}
         ):
             #找到带有answer标签的推送到调用端
             if "answer" in chunk:
                 yield chunk["answer"]
-'''#测试代码
-async def main():
-    queries = [
-        "南京理工大学的首任院长是谁？",
-        "他是什么军衔？"
-    ]
-    for query in queries:
-        print(f"校友提问: {query}\n")
-        print("资深校友正在回忆中...")
-        # 注意：现在传给 astream 的input必须是一个字典 {"input": query}
-        # 同时config也是一个字典{"configurable": {"session_id": "session_id"}}
-        async for chunk in final_chain.astream({"input": query},config={"configurable": {"session_id": "session_id"}}):
-            if "answer" in chunk:
-                print(chunk["answer"], end="", flush=True)
-        print("\n\n---回答结束---")
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
-'''

@@ -1,5 +1,5 @@
 #用于构建API
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException,UploadFile, File,Form
 #用于调用异步生成器
 from app.services.rag import RAGService
 #流式输出响应
@@ -13,6 +13,13 @@ from app.core.config import settings
 #导入获取会话历史函数
 from app.services.rag import get_session_history
 from langchain_core.messages import HumanMessage, AIMessage
+import tempfile
+import os
+from app.services.rag import process_uploaded_file
+from sqlalchemy import select
+from app.db.session import AsyncSessionLocal
+from app.db.models import SystemSetting, KnowledgeBase, Prompt
+
 
 #实例化FastAPI对象
 app = FastAPI()
@@ -20,55 +27,104 @@ app = FastAPI()
 rag_service = RAGService()
 #实例化Redis客户端
 redis_client = aioredis.from_url(settings.REDIS_URL)
-SESSION_SET_KEY = "dh:sessions"
+# 会话与自定义标题一一对应：单 HASH，field=session_id，value=标题（空串表示未设置）
+SESSION_INDEX_KEY = "dh:sessions"
+
+
+def _decode_str(raw: bytes | str | None) -> str | None:
+    if raw is None:
+        return None
+    text = raw.decode() if isinstance(raw, bytes) else raw
+    t = text.strip()
+    return t if t else None
 
 
 async def register_session_id(session_id: str) -> None:
-    await redis_client.sadd(SESSION_SET_KEY, session_id)
+    """首次对话时登记会话；已有记录不覆盖标题。"""
+    exists = await redis_client.hexists(SESSION_INDEX_KEY, session_id)
+    if not exists:
+        await redis_client.hset(SESSION_INDEX_KEY, session_id, "")
 
 
 async def unregister_session_id(session_id: str) -> None:
-    await redis_client.srem(SESSION_SET_KEY, session_id)
+    """删除会话在索引中的整条记录（含标题）。"""
+    await redis_client.hdel(SESSION_INDEX_KEY, session_id)
 
 
 async def list_session_ids() -> list[str]:
-    raw = await redis_client.smembers(SESSION_SET_KEY)
-    return sorted(s.decode() if isinstance(s, bytes) else s for s in raw)
-
-
-def _session_title_key(session_id: str) -> str:
-    return f"dh:session:title:{session_id}"
+    raw = await redis_client.hkeys(SESSION_INDEX_KEY)
+    return sorted(r.decode() if isinstance(r, bytes) else r for r in raw)
 
 
 async def get_session_title(session_id: str) -> str | None:
-    raw = await redis_client.get(_session_title_key(session_id))
-    if raw is None:
-        return None
-    return raw.decode() if isinstance(raw, bytes) else raw
+    raw = await redis_client.hget(SESSION_INDEX_KEY, session_id)
+    return _decode_str(raw)
 
 
 async def set_session_title(session_id: str, title: str) -> None:
     t = title.strip()
-    if not t:
-        await redis_client.delete(_session_title_key(session_id))
-    else:
-        await redis_client.set(_session_title_key(session_id), t)
+    await redis_client.hset(SESSION_INDEX_KEY, session_id, t)
 
+async def get_active_collection() -> str:
+    """从 MySQL system_settings → knowledge_bases 读取当前激活的 collection_name"""
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(KnowledgeBase.collection_name)
+            .join(SystemSetting, SystemSetting.active_kb_id == KnowledgeBase.id)
+            .where(SystemSetting.id == 1)
+        )
+        result = await session.execute(stmt)
+        name = result.scalar_one_or_none()
+        if name is None:
+            raise HTTPException(status_code=500, detail="未配置活跃知识库")
+        return name
 
-async def delete_session_title(session_id: str) -> None:
-    await redis_client.delete(_session_title_key(session_id))
+async def get_active_qa_system_prompt() -> tuple[str, int]:
+    """当前活跃提示词正文 + id，用于构建 chain 与缓存键。"""
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(Prompt.content, Prompt.id)
+            .join(SystemSetting, SystemSetting.active_prompt_id == Prompt.id)
+            .where(SystemSetting.id == 1)
+        )
+        row = (await session.execute(stmt)).one_or_none()
+        if row is None:
+            raise HTTPException(status_code=500, detail="未配置活跃提示词")
+        content, pid = row[0], row[1]
+        content = content.rstrip() + "\n\n请根据提供的【参考资料】来回答问题。【参考资料】：{context}"
+        return content, pid
 
+async def get_active_t_is_voice() -> tuple[float, bool]:
+    """读取 id=1 的 t_value（温度）、is_voice_mode。"""
+    async with AsyncSessionLocal() as session:
+        stmt = select(SystemSetting.t_value, SystemSetting.is_voice_mode).where(
+            SystemSetting.id == 1
+        )
+        row = (await session.execute(stmt)).one_or_none()
+        if row is None:
+            raise HTTPException(status_code=500, detail="未配置 system_settings")
+        t_val, voice = row[0], row[1]
+        return float(t_val), bool(voice)
 
 #定义聊天接口
 @app.post("/chat")
 async def text_text_chat(request: ChatRequest):
     await register_session_id(request.session_id)
-    #给生成器传入请求的query和session_id
+    collection_name = await get_active_collection()  # 从 MySQL 读
+    qa_system_prompt, prompt_id = await get_active_qa_system_prompt()
+    temperature, is_voice_mode = await get_active_t_is_voice()
     async def generate():
-        async for chunk in rag_service.chat(request.query, session_id=request.session_id):
+        async for chunk in rag_service.chat(
+            request.query,
+            session_id=request.session_id,
+            collection_name=collection_name, 
+            qa_system_prompt=qa_system_prompt,
+            prompt_id=prompt_id,
+            temperature=temperature,
+            is_voice_mode=is_voice_mode,
+        ):
             if chunk:
                 yield chunk
-    #SSE响应格式，流式输出
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
@@ -79,7 +135,6 @@ async def clear_history(request: ChatRequest):
     h = get_session_history(request.session_id)
     await h.clear()
     await unregister_session_id(request.session_id)
-    await delete_session_title(request.session_id)
 
 
 #定义获取会话历史接口
@@ -122,6 +177,31 @@ async def list_sessions():
         else:
             await unregister_session_id(sid)
     return out
+
+
+@app.post("/rag/upload")
+async def upload_rag_file(kb_name: str=Form(...), file: UploadFile = File(...)):
+    if not file.filename.endswith(".txt"):
+        raise HTTPException(status_code=400, detail="目前仅支持 .txt 文件")
+    
+    # 第一步：处理文件，获得自动生成的 collection_name
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+    try:
+        collection_name = await process_uploaded_file(tmp_path)
+    finally:
+        os.remove(tmp_path)
+    
+    # 第二步：将 name + collection_name 写入 MySQL
+    async with AsyncSessionLocal() as session:
+        kb = KnowledgeBase(name=kb_name, collection_name=collection_name)
+        session.add(kb)
+        await session.commit()
+        await session.refresh(kb)
+    
+    return {"id": kb.id, "name": kb.name, "collection_name": collection_name}
+
 
 
 if __name__ == "__main__":

@@ -274,9 +274,79 @@ async def reset_chat(browser_data, display_names: dict):
     )
     return [], new_state, data, radio_update, title_update, merged_names
 
+def on_kb_file_selected(file):
+    """用户选完文件后：暂存文件引用，并显示名称框与确认按钮。"""
+    if file is None:
+        return (
+            None,
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+        )
+    return (
+        file,
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(
+            value="已选择文件，请填写名称后点击 **确认上传**。",
+            visible=True,
+        ),
+    )
+
+async def confirm_kb_upload(pending_file, kb_name: str) -> str:
+    """第二步：带名称提交到后端（复用原有 upload_rag_file）。"""
+    if pending_file is None:
+        return "⚠️ 请先在上方选择文件"
+    return await upload_rag_file(pending_file, kb_name)
+
+async def upload_rag_file(file, kb_name: str) -> str:
+    if not kb_name or not kb_name.strip():
+        return "⚠️ 请先输入知识库名称"
+    if file is None:
+        return "⚠️ 请选择文件"
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        with open(file.name, "rb") as f:
+            response = await client.post(
+                f"{BASE}/rag/upload",
+                data={"kb_name": kb_name.strip()},
+                files={"file": (file.name.split("\\")[-1], f, "text/plain")},
+                timeout=None,
+            )
+    if response.status_code == 200:
+        return f"✅ 知识库「{response.json().get('name')}」创建成功"
+    return f"❌ 创建失败：{response.text}"
+
+def on_prompt_form_open():
+    """点击「新建提示词」后展开输入区。"""
+    return (
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(value="请填写提示词后点击 **确认保存**。", visible=True),
+    )
 
 
-
-
+async def confirm_save_prompt(prompt_body: str, prompt_name: str) -> str:
+    """把用户填的 prompt 正文 + 名称 POST 到后端写入 MySQL。"""
+    if not prompt_body or not prompt_body.strip():
+        return "⚠️ 请填写提示词正文"
+    if not prompt_name or not prompt_name.strip():
+        return "⚠️ 请填写提示词名称"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{BASE}/prompts",
+                data={
+                    "prompt_name": prompt_name.strip(),
+                    "prompt_body": prompt_body.strip(),
+                },
+            )
+        if response.status_code == 200:
+            return f"✅ 提示词「{response.json().get('name')}」保存成功"
+        return f"❌ 保存失败：{response.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接到后端服务器"
+    except Exception as e:
+        return f"❌ 异常：{str(e)}"
 
 

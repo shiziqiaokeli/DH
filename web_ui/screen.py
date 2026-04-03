@@ -12,6 +12,10 @@ from screen_handlers import (
     text_text_chat,
     toggle_more_menu,
     user_submit,
+    on_kb_file_selected,
+    confirm_kb_upload,
+    on_prompt_form_open,
+    confirm_save_prompt,
 )
 _CSS_PATH = Path(__file__).resolve().parent / "styles" / "screen.css"
 SCREEN_CSS = _CSS_PATH.read_text(encoding="utf-8")
@@ -38,7 +42,38 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                     file_count="single", 
                     file_types=[".txt",] 
                 )
+                pending_kb_file = gr.State(value=None)
+                kb_name_input = gr.Textbox(
+                    label="",
+                    placeholder="给知识库起个名字",
+                    show_label=False,
+                    visible=False,
+                )
+                confirm_kb_upload_btn = gr.Button(
+                    "确认上传", variant="secondary", size="lg", visible=False
+                )
+                rag_status = gr.Markdown("", visible=False)  # 初始隐藏
+
                 new_prompt_btn = gr.Button("新建提示词", variant="secondary", size="lg")
+                prompt_body_input = gr.Textbox(
+                    label="",
+                    value="你是一个/名XXXX的XXXX。 要求： 1. 仅根据资料内容回答，不要胡编乱造。 2. 如果资料中没提到相关信息，请尝试根据你已有的知识回答，并注明‘根据通用知识补充’。 3. 回答语气要严谨 4. 回答要简洁明了，不要过于冗长，不要回答问题以外的内容。",
+                    show_label=False,
+                    lines=6,
+                    max_lines=12,
+                    visible=False,
+                )
+                prompt_name_input = gr.Textbox(
+                    label="",
+                    placeholder="给提示词起个名字",
+                    show_label=False,
+                    visible=False,
+                )
+                confirm_prompt_btn = gr.Button(
+                    "确认保存", variant="secondary", size="lg", visible=False
+                )
+                prompt_status = gr.Markdown("", visible=False)
+
                 new_model_btn = gr.Button("训练模型", variant="secondary", size="lg")
                 gr.Markdown("""<div style="font-size: 16px; font-weight: 600; padding: 0;text-align: center;">
                 对话
@@ -196,6 +231,42 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         show_progress="hidden",
         js="""() => { setTimeout(() => { window.location.reload(); }, 100); }"""
     )
+    
+    new_rag_btn.upload(
+        fn=on_kb_file_selected,
+        inputs=[new_rag_btn],
+        outputs=[
+            pending_kb_file,
+            kb_name_input,
+            confirm_kb_upload_btn,
+            rag_status,
+        ],
+        queue=False,
+    )
+    confirm_kb_upload_btn.click(
+        fn=confirm_kb_upload,
+        inputs=[pending_kb_file, kb_name_input],
+        outputs=[rag_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[rag_status],
+    )   
+    new_prompt_btn.click(
+        fn=on_prompt_form_open,
+        inputs=None,
+        outputs=[prompt_body_input, prompt_name_input, confirm_prompt_btn, prompt_status],
+        queue=False,
+    )
+    confirm_prompt_btn.click(
+        fn=confirm_save_prompt,
+        inputs=[prompt_body_input, prompt_name_input],
+        outputs=[prompt_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[prompt_status],
+    ) 
 
 if __name__ == "__main__":
     demo.launch(
