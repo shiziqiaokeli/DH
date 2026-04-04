@@ -183,10 +183,14 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                                         save_t_btn = gr.Button("保存", variant="primary", size="sm")
                                         close_t_btn = gr.Button("关闭", variant="secondary", size="sm")
                             change_model_btn = gr.Button("model", size="lg",variant="secondary",elem_id="mini-btn")
-                            
-                            switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn") 
+
+
+                            ref_audio_btn = gr.Button("ref_audio", size="lg",variant="secondary",elem_id="mini-btn")
+                             
+
                             with gr.Row(elem_classes="nav-item nav-right"): 
-                                submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn")                   
+                                switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn")
+                            submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn")                       
     
     demo.load(
         on_page_load,
