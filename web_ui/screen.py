@@ -83,6 +83,7 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                 prompt_status = gr.Markdown("", visible=False)
 
                 new_model_btn = gr.Button("训练模型", variant="secondary", size="lg")
+
                 gr.Markdown("""<div style="font-size: 16px; font-weight: 600; padding: 0;text-align: center;">
                 对话
                 </div>""")
@@ -171,7 +172,7 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                                 change_temperature_btn = gr.Button("t", size="lg", variant="secondary", elem_id="mini-btn")
                                 with gr.Column(visible=False, elem_id="t-selector-panel") as t_panel:
                                     t_input = gr.Number(
-                                        label="温度 (> 0)",
+                                        label="温度参数(>0)",
                                         value=0.1,
                                         minimum=0.01,
                                         step=0.1,
@@ -183,11 +184,9 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                                         close_t_btn = gr.Button("关闭", variant="secondary", size="sm")
                             change_model_btn = gr.Button("model", size="lg",variant="secondary",elem_id="mini-btn")
                             
-                            
+                            switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn") 
                             with gr.Row(elem_classes="nav-item nav-right"): 
-                                switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn") 
-                            audio_submit_btn = gr.Button("🎙️", size="lg",variant="primary",elem_id="mini-btn") 
-                            submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn") 
+                                submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn")                   
     
     demo.load(
         on_page_load,
@@ -372,7 +371,6 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         inputs=None,
         outputs=[switch_btn],
     )
-
     # 点击切换
     switch_btn.click(
         fn=toggle_voice_mode,
