@@ -349,4 +349,134 @@ async def confirm_save_prompt(prompt_body: str, prompt_name: str) -> str:
     except Exception as e:
         return f"❌ 异常：{str(e)}"
 
+async def open_kb_selector() -> tuple:
+    """拉取所有知识库列表及当前激活项，返回给 Radio 弹窗"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/knowledgebases")
+        if r.status_code != 200:
+            return gr.update(choices=[], value=None), gr.update(visible=True)
+        data = r.json()
+        choices = [(kb["name"], str(kb["id"])) for kb in data["knowledgebases"]]
+        active = str(data["active_kb_id"]) if data["active_kb_id"] else None
+        return gr.update(choices=choices, value=active), gr.update(visible=True)
+    except httpx.ConnectError:
+        return gr.update(choices=[], value=None), gr.update(visible=True)
 
+
+async def select_kb(kb_id_str: str | None) -> str:
+    """用户选中某知识库后，PUT 到后端更新 system_settings"""
+    if not kb_id_str:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.put(
+                f"{BASE}/settings/active_kb",
+                json={"kb_id": int(kb_id_str)},
+            )
+        if r.status_code == 200:
+            return "✅ 知识库已切换"
+        return f"❌ 切换失败：{r.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接后端"
+
+async def open_prompt_selector() -> tuple:
+    """拉取所有提示词列表及当前激活项，返回给 Radio 弹窗"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/prompts")
+        if r.status_code != 200:
+            return gr.update(choices=[], value=None), gr.update(visible=True)
+        data = r.json()
+        choices = [(prompt["name"], str(prompt["id"])) for prompt in data["prompts"]]
+        active = str(data["active_prompt_id"]) if data["active_prompt_id"] else None
+        return gr.update(choices=choices, value=active), gr.update(visible=True)
+    except httpx.ConnectError:
+        return gr.update(choices=[], value=None), gr.update(visible=True)
+
+
+async def select_prompt(prompt_id_str: str | None) -> str:
+    """用户选中某提示词后，PUT 到后端更新 system_settings"""
+    if not prompt_id_str:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.put(
+                f"{BASE}/settings/active_prompt",
+                json={"prompt_id": int(prompt_id_str)},
+            )
+        if r.status_code == 200:
+            return "✅ 提示词已切换"
+        return f"❌ 切换失败：{r.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接后端"
+
+async def open_t_panel() -> tuple:
+    """读取当前 t_value，打开温度输入面板"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/settings/t_value")
+        if r.status_code == 200:
+            current = r.json().get("t_value", 0.1)
+        else:
+            current = 0.1
+    except httpx.ConnectError:
+        current = 0.1
+    return gr.update(value=current), gr.update(visible=True)
+
+
+async def save_t_value(t_val: float | None) -> str:
+    """校验并保存温度参数到后端"""
+    if t_val is None:
+        return "⚠️ 请输入温度值"
+    try:
+        t_val = float(t_val)
+    except (ValueError, TypeError):
+        return "⚠️ 温度必须为数字"
+    if t_val <= 0:
+        return "⚠️ 温度必须大于 0"
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.put(
+                f"{BASE}/settings/t_value",
+                json={"t_value": t_val},
+            )
+        if r.status_code == 200:
+            return f"✅ 温度已设为 {t_val}"
+        return f"❌ 保存失败：{r.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接后端"
+
+async def get_voice_mode_label() -> dict:
+    """页面加载时读取 is_voice_mode，返回按钮初始文字"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/settings/t_value")
+            # 复用已有接口：is_voice_mode 可以从 t_value 同路径读取
+            # 实际我们需要专门读 is_voice_mode，用 get_active_t_is_voice 的逻辑
+            # 这里直接调一个专用接口更清晰，后面会补
+        # 上面是占位，改用下面这个专用接口
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/settings/voice_mode")
+        if r.status_code == 200:
+            is_voice = r.json().get("is_voice_mode", False)
+        else:
+            is_voice = False
+    except httpx.ConnectError:
+        is_voice = False
+    label = "语音输出" if is_voice else "文本输出"
+    return gr.update(value=label)
+
+
+async def toggle_voice_mode() -> dict:
+    """点击切换按钮：PUT 取反，返回新按钮文字"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.put(f"{BASE}/settings/toggle_voice_mode")
+        if r.status_code == 200:
+            is_voice = r.json().get("is_voice_mode", False)
+            label = "语音输出" if is_voice else "文本输出"
+            return gr.update(value=label)
+        return gr.update()
+    except httpx.ConnectError:
+        return gr.update()

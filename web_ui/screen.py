@@ -16,6 +16,14 @@ from screen_handlers import (
     confirm_kb_upload,
     on_prompt_form_open,
     confirm_save_prompt,
+    open_kb_selector,
+    select_kb,
+    open_prompt_selector,
+    select_prompt,
+    open_t_panel,
+    save_t_value,
+    get_voice_mode_label,
+    toggle_voice_mode,
 )
 _CSS_PATH = Path(__file__).resolve().parent / "styles" / "screen.css"
 SCREEN_CSS = _CSS_PATH.read_text(encoding="utf-8")
@@ -144,12 +152,40 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                             )   
                         #工具栏左右对齐
                         with gr.Row():
-                            change_rag_btn = gr.Button("rag", size="lg",variant="secondary",elem_id="mini-btn")
-                            change_prompt_btn = gr.Button("prompt", size="lg",variant="secondary",elem_id="mini-btn")
-                            change_temperature_btn = gr.Button("t", size="lg",variant="secondary",elem_id="mini-btn")
+
+                            with gr.Column(elem_id="kb-selector-anchor"):
+                                change_rag_btn = gr.Button("rag", size="lg", variant="secondary", elem_id="mini-btn")
+                                # 弹窗放在锚点内部，CSS 负责让它向上浮，不影响行布局
+                                with gr.Column(visible=False, elem_id="kb-selector-panel") as kb_selector_panel:
+                                    kb_radio = gr.Radio(label="选择知识库", choices=[], value=None)
+                                    kb_select_status = gr.Markdown("", visible=False)
+                                    close_kb_btn = gr.Button("关闭", variant="secondary", size="sm")                            
+                            with gr.Column(elem_id="kb-selector-anchor"):
+                                change_prompt_btn = gr.Button("prompt", size="lg", variant="secondary", elem_id="mini-btn")
+                                # 弹窗放在锚点内部，CSS 负责让它向上浮，不影响行布局
+                                with gr.Column(visible=False, elem_id="kb-selector-panel") as prompt_selector_panel:
+                                    prompt_radio = gr.Radio(label="选择提示词", choices=[], value=None)
+                                    prompt_select_status = gr.Markdown("", visible=False)
+                                    close_prompt_btn = gr.Button("关闭", variant="secondary", size="sm")
+                            with gr.Column(elem_id="t-selector-anchor"):
+                                change_temperature_btn = gr.Button("t", size="lg", variant="secondary", elem_id="mini-btn")
+                                with gr.Column(visible=False, elem_id="t-selector-panel") as t_panel:
+                                    t_input = gr.Number(
+                                        label="温度 (> 0)",
+                                        value=0.1,
+                                        minimum=0.01,
+                                        step=0.1,
+                                        precision=2,
+                                    )
+                                    t_status = gr.Markdown("", visible=False)
+                                    with gr.Row():
+                                        save_t_btn = gr.Button("保存", variant="primary", size="sm")
+                                        close_t_btn = gr.Button("关闭", variant="secondary", size="sm")
                             change_model_btn = gr.Button("model", size="lg",variant="secondary",elem_id="mini-btn")
+                            
+                            
                             with gr.Row(elem_classes="nav-item nav-right"): 
-                                switch_btn = gr.Button("文本/语音输出", size="lg",variant="secondary",elem_id="mini-btn") 
+                                switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn") 
                             audio_submit_btn = gr.Button("🎙️", size="lg",variant="primary",elem_id="mini-btn") 
                             submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn") 
     
@@ -267,6 +303,84 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         fn=lambda: gr.update(visible=True),
         outputs=[prompt_status],
     ) 
+    change_rag_btn.click(
+        fn=open_kb_selector,
+        inputs=None,
+        outputs=[kb_radio, kb_selector_panel],
+        queue=False,
+    )
+    kb_radio.change(
+        fn=select_kb,
+        inputs=[kb_radio],
+        outputs=[kb_select_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[kb_select_status],
+    )
+    close_kb_btn.click(
+        fn=lambda: (gr.update(visible=False), gr.update(value="")),
+        inputs=None,
+        outputs=[kb_selector_panel, kb_select_status],
+        queue=False,
+    )
+    change_prompt_btn.click(
+        fn=open_prompt_selector,
+        inputs=None,
+        outputs=[prompt_radio, prompt_selector_panel],   
+        queue=False,
+    )
+    prompt_radio.change(
+        fn=select_prompt,
+        inputs=[prompt_radio],
+        outputs=[prompt_select_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[prompt_select_status],
+    )
+    close_prompt_btn.click(                           
+        fn=lambda: (gr.update(visible=False), gr.update(value="")),
+        inputs=None,
+        outputs=[prompt_selector_panel, prompt_select_status], 
+        queue=False,
+    )
+    change_temperature_btn.click(
+        fn=open_t_panel,
+        inputs=None,
+        outputs=[t_input, t_panel],
+        queue=False,
+    )
+    save_t_btn.click(
+        fn=save_t_value,
+        inputs=[t_input],
+        outputs=[t_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[t_status],
+    )
+    close_t_btn.click(
+        fn=lambda: (gr.update(visible=False), gr.update(value="")),
+        inputs=None,
+        outputs=[t_panel, t_status],
+        queue=False,
+    )
+    # 初始化语音/文本切换按钮状态
+    demo.load(
+        fn=get_voice_mode_label,
+        inputs=None,
+        outputs=[switch_btn],
+    )
+
+    # 点击切换
+    switch_btn.click(
+        fn=toggle_voice_mode,
+        inputs=None,
+        outputs=[switch_btn],
+        queue=False,
+    )
+
 
 if __name__ == "__main__":
     demo.launch(

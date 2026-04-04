@@ -202,7 +202,142 @@ async def upload_rag_file(kb_name: str=Form(...), file: UploadFile = File(...)):
     
     return {"id": kb.id, "name": kb.name, "collection_name": collection_name}
 
+@app.get("/knowledgebases")
+async def list_knowledgebases():
+    """列出所有知识库，并返回当前激活的 active_kb_id"""
+    async with AsyncSessionLocal() as session:
+        kbs = (await session.execute(select(KnowledgeBase))).scalars().all()
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        active_kb_id = setting.active_kb_id if setting else None
+    return {
+        "active_kb_id": active_kb_id,
+        "knowledgebases": [{"id": kb.id, "name": kb.name} for kb in kbs],
+    }
 
+
+@app.put("/settings/active_kb")
+async def update_active_kb(body: dict):
+    """更新 system_settings 中的 active_kb_id"""
+    kb_id = body.get("kb_id")
+    if not kb_id:
+        raise HTTPException(status_code=400, detail="缺少 kb_id")
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+        setting.active_kb_id = int(kb_id)
+        await session.commit()
+    return {"ok": True, "active_kb_id": kb_id}
+
+@app.get("/prompts")
+async def list_prompts():
+    """列出所有提示词，并返回当前激活的 active_prompt_id"""
+    async with AsyncSessionLocal() as session:
+        pbs = (await session.execute(select(Prompt))).scalars().all()
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        active_prompt_id = setting.active_prompt_id if setting else None
+    return {
+        "active_prompt_id": active_prompt_id,
+        "prompts": [{"id": pb.id, "name": pb.name} for pb in pbs],
+    }
+
+
+@app.put("/settings/active_prompt")
+async def update_active_pb(body: dict):
+    """更新 system_settings 中的 active_prompt_id"""
+    prompt_id = body.get("prompt_id")
+    if not prompt_id:
+        raise HTTPException(status_code=400, detail="缺少 pb_id")
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+        setting.active_prompt_id = int(prompt_id)
+        await session.commit()
+    return {"ok": True, "active_prompt_id": prompt_id}
+
+@app.get("/settings/t_value")
+async def get_t_value():
+    """读取当前温度参数"""
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+    return {"t_value": float(setting.t_value)}
+
+
+@app.put("/settings/t_value")
+async def update_t_value(body: dict):
+    """更新温度参数，必须为正浮点数"""
+    t_val = body.get("t_value")
+    if t_val is None:
+        raise HTTPException(status_code=400, detail="缺少 t_value")
+    try:
+        t_val = float(t_val)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="t_value 必须为数字")
+    if t_val <= 0:
+        raise HTTPException(status_code=400, detail="t_value 必须大于 0")
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+        setting.t_value = t_val
+        await session.commit()
+    return {"ok": True, "t_value": t_val}
+
+@app.get("/settings/voice_mode")
+async def get_voice_mode():
+    """读取当前 is_voice_mode"""
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+    return {"is_voice_mode": bool(setting.is_voice_mode)}
+
+@app.put("/settings/toggle_voice_mode")
+async def toggle_voice_mode():
+    """将 is_voice_mode 取反并保存，返回新状态"""
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+        setting.is_voice_mode = not setting.is_voice_mode
+        new_val = setting.is_voice_mode
+        await session.commit()
+    return {"is_voice_mode": new_val}
 
 if __name__ == "__main__":
     import uvicorn
