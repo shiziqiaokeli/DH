@@ -19,6 +19,7 @@ from app.services.rag import process_uploaded_file
 from sqlalchemy import select
 from app.db.session import AsyncSessionLocal
 from app.db.models import SystemSetting, KnowledgeBase, Prompt, VoiceModel, ReferAudio
+import httpx
 
 #实例化FastAPI对象
 app = FastAPI()
@@ -290,7 +291,7 @@ async def list_voice_models():
 
 @app.put("/settings/active_model")
 async def update_active_model(body: dict):
-    """更新 system_settings 中的 active_model_id"""
+    """更新 active_model_id，并通知 GPT-SoVITS 加载对应权重"""
     model_id = body.get("model_id")
     if not model_id:
         raise HTTPException(status_code=400, detail="缺少 model_id")
@@ -304,6 +305,33 @@ async def update_active_model(body: dict):
             raise HTTPException(status_code=500, detail="system_settings 未初始化")
         setting.active_model_id = int(model_id)
         await session.commit()
+
+        model = (
+            await session.execute(
+                select(VoiceModel).where(VoiceModel.id == int(model_id))
+            )
+        ).scalar_one_or_none()
+        if model is None:
+            raise HTTPException(status_code=404, detail="未找到该语音模型")
+
+    gsv_base = settings.GPT_SOVITS_URL
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            gpt_r = await client.get(
+                f"{gsv_base}/set_gpt_weights",
+                params={"weights_path": model.ckpt_path},
+            )
+            sovits_r = await client.get(
+                f"{gsv_base}/set_sovits_weights",
+                params={"weights_path": model.pth_path},
+            )
+        if gpt_r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"GPT 权重切换失败: {gpt_r.text}")
+        if sovits_r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"SoVITS 权重切换失败: {sovits_r.text}")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="无法连接到 GPT-SoVITS 服务")
+
     return {"ok": True, "active_model_id": model_id}
 
 

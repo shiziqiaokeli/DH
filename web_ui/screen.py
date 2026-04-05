@@ -379,6 +379,11 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         inputs=None,
         outputs=[model_selector_panel, model_select_status],
         queue=False,
+    ).then(
+        fn=lambda: (gr.update(visible=False), gr.update(value="")),
+        inputs=None,
+        outputs=[model_selector_panel, model_select_status],
+        queue=False,        
     )
     change_audio_btn.click(
         fn=open_audio_selector,
