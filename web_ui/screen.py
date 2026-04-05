@@ -28,6 +28,7 @@ from screen_handlers import (
     save_t_value,
     get_voice_mode_label,
     toggle_voice_mode,
+    voice_tts_if_needed,
 )
 _CSS_PATH = Path(__file__).resolve().parent / "styles" / "screen.css"
 SCREEN_CSS = _CSS_PATH.read_text(encoding="utf-8")
@@ -43,9 +44,10 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
     session_state = gr.State(value={"session_id": None})
     more_menu_open = gr.State(value=False)
     display_names = gr.State(value={})  # session_id -> display_name 的映射
+    voice_mode_state = gr.State(value=False)   # 同步 is_voice_mode 的前端副本
     with gr.Row():#分左右
         with gr.Column(scale=1, elem_id="leftside") as sidebar_col:#（左侧）分上下
-            with gr.Column(scale=1):#左上设计
+            with gr.Column():#左上设计
                 new_chat_btn = gr.Button("📝发起新对话", variant="primary", size="lg")
                 new_rag_btn = gr.UploadButton(
                     "新建知识库",  
@@ -99,9 +101,6 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                     value=None,
                     show_label=False
                     )
-                
-            with gr.Column(scale=0):#左下设计
-                rag_model_btn=gr.Button(" ⚙️ 设 置 ", variant="secondary", size="lg")
         with gr.Column(scale=5, elem_id="rightside"):#（右侧）分上下
             with gr.Row(elem_id="top-nav"):#右上设计
                 gr.Markdown("""<div class="nav-item" style="font-size: 16px; font-weight: 600; padding: 0;text-align: left;">
@@ -145,6 +144,12 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                     placeholder='<span style="font-size: 24px;">你好</span><br><span style="font-size: 30px;"><strong>需要我为你做些什么？</strong></span>',
                     editable=False,
                     buttons=[]
+                )
+                audio_player = gr.Audio(
+                    visible=False,
+                    autoplay=True,
+                    show_label=False,
+                    elem_id="tts-audio-player",
                 )
                 # 输入区和工具栏(顶层绝对定位，向上扩展)
                 with gr.Column(elem_id="input-wrapper"):
@@ -225,6 +230,10 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                 fn=text_text_chat,
                 inputs=[chatbot, session_state],
                 outputs=[chatbot],
+            ).then(
+                fn=voice_tts_if_needed,
+                inputs=[chatbot, voice_mode_state],
+                outputs=[audio_player],
             ).then(
                 fn=refresh_session_radio_after_reply,
                 inputs=[session_state, display_names],
@@ -379,12 +388,7 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         inputs=None,
         outputs=[model_selector_panel, model_select_status],
         queue=False,
-    ).then(
-        fn=lambda: (gr.update(visible=False), gr.update(value="")),
-        inputs=None,
-        outputs=[model_selector_panel, model_select_status],
-        queue=False,        
-    )
+    )        
     change_audio_btn.click(
         fn=open_audio_selector,
         inputs=None,
@@ -436,13 +440,13 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
     demo.load(
         fn=get_voice_mode_label,
         inputs=None,
-        outputs=[switch_btn],
+        outputs=[switch_btn, voice_mode_state],
     )
     # 点击切换
     switch_btn.click(
         fn=toggle_voice_mode,
         inputs=None,
-        outputs=[switch_btn],
+        outputs=[switch_btn, voice_mode_state],
         queue=False,
     )
 

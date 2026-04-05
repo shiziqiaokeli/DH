@@ -510,25 +510,16 @@ async def save_t_value(t_val: float | None) -> str:
     except httpx.ConnectError:
         return "🔌 无法连接后端"
 
-async def get_voice_mode_label() -> dict:
-    """页面加载时读取 is_voice_mode，返回按钮初始文字"""
+async def get_voice_mode_label() -> tuple:
+    """页面加载时读取 is_voice_mode，返回按钮文字 + 语音模式布尔值"""
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
-            r = await client.get(f"{BASE}/settings/t_value")
-            # 复用已有接口：is_voice_mode 可以从 t_value 同路径读取
-            # 实际我们需要专门读 is_voice_mode，用 get_active_t_is_voice 的逻辑
-            # 这里直接调一个专用接口更清晰，后面会补
-        # 上面是占位，改用下面这个专用接口
-        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
             r = await client.get(f"{BASE}/settings/voice_mode")
-        if r.status_code == 200:
-            is_voice = r.json().get("is_voice_mode", False)
-        else:
-            is_voice = False
+        is_voice = r.json().get("is_voice_mode", False) if r.status_code == 200 else False
     except httpx.ConnectError:
         is_voice = False
     label = "语音输出" if is_voice else "文本输出"
-    return gr.update(value=label)
+    return gr.update(value=label), is_voice
 
 
 async def toggle_voice_mode() -> dict:
@@ -539,7 +530,49 @@ async def toggle_voice_mode() -> dict:
         if r.status_code == 200:
             is_voice = r.json().get("is_voice_mode", False)
             label = "语音输出" if is_voice else "文本输出"
-            return gr.update(value=label)
+            return gr.update(value=label), is_voice
         return gr.update()
     except httpx.ConnectError:
         return gr.update()
+
+async def voice_tts_if_needed(history: list, is_voice_mode: bool) -> dict:
+    """语音模式下，提取最后一条 AI 文本，调用 /tts_proxy 拿音频写临时文件后返回路径"""
+    import tempfile
+
+    if not is_voice_mode or not history:
+        return gr.update(visible=False, value=None)
+
+    last_msg = history[-1] if history else None
+    if not last_msg or last_msg.get("role") != "assistant":
+        return gr.update(visible=False, value=None)
+
+    content = last_msg.get("content", "")
+    # content 可能是 list[dict] 格式（流式输出时写入的结构）
+    if isinstance(content, list):
+        text = "".join(
+            item.get("text", "") for item in content if isinstance(item, dict)
+        )
+    else:
+        text = str(content)
+
+    text = text.strip()
+    if not text:
+        return gr.update(visible=False, value=None)
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.get(f"{BASE}/tts_proxy", params={"text": text})
+
+        if response.status_code != 200:
+            return gr.update(visible=False, value=None)
+
+        # 写入临时 WAV 文件，由 Gradio Audio 组件读取播放
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+            f.write(response.content)
+            tmp_path = f.name
+
+        return gr.update(value=tmp_path, visible=True)
+    except httpx.ConnectError:
+        return gr.update(visible=False, value=None)
+    except Exception:
+        return gr.update(visible=False, value=None)

@@ -437,6 +437,56 @@ async def toggle_voice_mode():
         await session.commit()
     return {"is_voice_mode": new_val}
 
+async def get_active_refer_audio() -> ReferAudio:
+    """从 DB 读取当前活跃的参考音频配置"""
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(ReferAudio)
+            .join(SystemSetting, SystemSetting.active_audio_id == ReferAudio.id)
+            .where(SystemSetting.id == 1)
+        )
+        audio = (await session.execute(stmt)).scalar_one_or_none()
+        if audio is None:
+            raise HTTPException(status_code=500, detail="未配置活跃参考音频")
+        return audio
+
+
+@app.get("/tts_proxy")
+async def tts_proxy(text: str) -> StreamingResponse:
+    """读取当前活跃参考音频配置，代理调用 GPT-SoVITS，流式返回 WAV 音频"""
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="text 不能为空")
+
+    audio = await get_active_refer_audio()
+    gsv_base = settings.GPT_SOVITS_URL
+
+    params = {
+        "text": text,
+        "text_lang": "zh",
+        "ref_audio_path": audio.audio_path,
+        "prompt_lang": "zh",
+        "prompt_text": audio.text,
+        "media_type": "wav",
+        "streaming_mode": True,   # 服务端逐句合成，降低首包延迟
+        "speed_factor": 1.0,
+        "parallel_infer": True,
+        "repetition_penalty": 1.35,
+    }
+
+    async def audio_generator():
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream("GET", f"{gsv_base}/tts", params=params) as resp:
+                    if resp.status_code != 200:
+                        return
+                    async for chunk in resp.aiter_bytes(chunk_size=4096):
+                        if chunk:
+                            yield chunk
+        except httpx.ConnectError:
+            pass
+
+    return StreamingResponse(audio_generator(), media_type="audio/wav")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
