@@ -153,7 +153,6 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                             )   
                         #工具栏左右对齐
                         with gr.Row():
-
                             with gr.Column(elem_id="kb-selector-anchor"):
                                 change_rag_btn = gr.Button("rag", size="lg", variant="secondary", elem_id="mini-btn")
                                 # 弹窗放在锚点内部，CSS 负责让它向上浮，不影响行布局
@@ -185,8 +184,7 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                             change_model_btn = gr.Button("model", size="lg",variant="secondary",elem_id="mini-btn")
 
 
-                            ref_audio_btn = gr.Button("ref_audio", size="lg",variant="secondary",elem_id="mini-btn")
-                             
+                            
 
                             with gr.Row(elem_classes="nav-item nav-right"): 
                                 switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn")
@@ -349,6 +347,11 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         queue=False,
     )
     change_temperature_btn.click(
+        fn=open_t_panel,
+        inputs=None,
+        outputs=[t_input, t_panel],
+        queue=False,
+    ).then(
         fn=open_t_panel,
         inputs=None,
         outputs=[t_input, t_panel],
