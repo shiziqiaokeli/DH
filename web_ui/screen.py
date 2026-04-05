@@ -20,6 +20,10 @@ from screen_handlers import (
     select_kb,
     open_prompt_selector,
     select_prompt,
+    open_model_selector,
+    select_model, 
+    open_audio_selector, 
+    select_audio,
     open_t_panel,
     save_t_value,
     get_voice_mode_label,
@@ -82,7 +86,9 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                 )
                 prompt_status = gr.Markdown("", visible=False)
 
-                new_model_btn = gr.Button("训练模型", variant="secondary", size="lg")
+                new_model_btn = gr.Button("训练GSV模型", variant="secondary", size="lg")
+
+                new_audio_btn = gr.Button("上传参考音频", variant="secondary", size="lg")
 
                 gr.Markdown("""<div style="font-size: 16px; font-weight: 600; padding: 0;text-align: center;">
                 对话
@@ -154,14 +160,14 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                         #工具栏左右对齐
                         with gr.Row():
                             with gr.Column(elem_id="kb-selector-anchor"):
-                                change_rag_btn = gr.Button("rag", size="lg", variant="secondary", elem_id="mini-btn")
+                                change_rag_btn = gr.Button("知识库", size="lg", variant="secondary", elem_id="mini-btn")
                                 # 弹窗放在锚点内部，CSS 负责让它向上浮，不影响行布局
                                 with gr.Column(visible=False, elem_id="kb-selector-panel") as kb_selector_panel:
                                     kb_radio = gr.Radio(label="选择知识库", choices=[], value=None)
                                     kb_select_status = gr.Markdown("", visible=False)
                                     close_kb_btn = gr.Button("关闭", variant="secondary", size="sm")                            
                             with gr.Column(elem_id="kb-selector-anchor"):
-                                change_prompt_btn = gr.Button("prompt", size="lg", variant="secondary", elem_id="mini-btn")
+                                change_prompt_btn = gr.Button("提示词", size="lg", variant="secondary", elem_id="mini-btn")
                                 # 弹窗放在锚点内部，CSS 负责让它向上浮，不影响行布局
                                 with gr.Column(visible=False, elem_id="kb-selector-panel") as prompt_selector_panel:
                                     prompt_radio = gr.Radio(label="选择提示词", choices=[], value=None)
@@ -181,11 +187,18 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                                     with gr.Row():
                                         save_t_btn = gr.Button("保存", variant="primary", size="sm")
                                         close_t_btn = gr.Button("关闭", variant="secondary", size="sm")
-                            change_model_btn = gr.Button("model", size="lg",variant="secondary",elem_id="mini-btn")
-
-
-                            
-
+                            with gr.Column(elem_id="kb-selector-anchor"):
+                                change_model_btn = gr.Button("GSV模型", size="lg", variant="secondary", elem_id="mini-btn")
+                                with gr.Column(visible=False, elem_id="kb-selector-panel") as model_selector_panel:
+                                    model_radio = gr.Radio(label="选择 GSV 模型", choices=[], value=None)
+                                    model_select_status = gr.Markdown("", visible=False)
+                                    close_model_btn = gr.Button("关闭", variant="secondary", size="sm")
+                            with gr.Column(elem_id="kb-selector-anchor"):
+                                change_audio_btn = gr.Button("参考音频", size="lg", variant="secondary", elem_id="mini-btn")
+                                with gr.Column(visible=False, elem_id="kb-selector-panel") as audio_selector_panel:
+                                    audio_radio = gr.Radio(label="选择参考音频", choices=[], value=None)
+                                    audio_select_status = gr.Markdown("", visible=False)
+                                    close_audio_btn = gr.Button("关闭", variant="secondary", size="sm")
                             with gr.Row(elem_classes="nav-item nav-right"): 
                                 switch_btn = gr.Button("文本输出", size="lg",variant="primary",elem_id="mini-btn")
                             submit_btn = gr.Button("🛩️", size="lg",variant="primary",elem_id="mini-btn")                       
@@ -346,6 +359,48 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         outputs=[prompt_selector_panel, prompt_select_status], 
         queue=False,
     )
+    change_model_btn.click(
+        fn=open_model_selector,
+        inputs=None,
+        outputs=[model_radio, model_selector_panel],
+        queue=False,
+    )
+    model_radio.change(
+        fn=select_model,
+        inputs=[model_radio],
+        outputs=[model_select_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[model_select_status],
+    )
+    close_model_btn.click(
+        fn=lambda: (gr.update(visible=False), gr.update(value="")),
+        inputs=None,
+        outputs=[model_selector_panel, model_select_status],
+        queue=False,
+    )
+    change_audio_btn.click(
+        fn=open_audio_selector,
+        inputs=None,
+        outputs=[audio_radio, audio_selector_panel],
+        queue=False,
+    )
+    audio_radio.change(
+        fn=select_audio,
+        inputs=[audio_radio],
+        outputs=[audio_select_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[audio_select_status],
+    )
+    close_audio_btn.click(
+        fn=lambda: (gr.update(visible=False), gr.update(value="")),
+        inputs=None,
+        outputs=[audio_selector_panel, audio_select_status],
+        queue=False,
+    )    
     change_temperature_btn.click(
         fn=open_t_panel,
         inputs=None,

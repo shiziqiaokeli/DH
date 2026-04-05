@@ -27,8 +27,16 @@ class VoiceModel(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, comment="用户自定义名称")
-    ckpt_path: Mapped[str] = mapped_column(String(255), comment="模型权重路径")
-    ref_audio_path: Mapped[str] = mapped_column(String(255), comment="参考音频路径")
+    pth_path: Mapped[str] = mapped_column(String(255), comment="sovits模型路径")
+    ckpt_path: Mapped[str] = mapped_column(String(255), comment="gpt模型路径")
+
+class ReferAudio(Base):
+    __tablename__ = "refer_audios"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, comment="用户自定义名称")
+    audio_path: Mapped[str] = mapped_column(String(255), comment="参考音频路径")
+    text: Mapped[str] = mapped_column(String(255), comment="参考文本")
 
 # 4. 全局活跃配置表 (单例模式)
 class SystemSetting(Base):
@@ -41,5 +49,6 @@ class SystemSetting(Base):
     active_kb_id: Mapped[int] = mapped_column(ForeignKey("knowledge_bases.id"))
     active_prompt_id: Mapped[int] = mapped_column(ForeignKey("prompts.id"))
     active_model_id: Mapped[int] = mapped_column(ForeignKey("voice_models.id"))
+    active_audio_id: Mapped[int] = mapped_column(ForeignKey("refer_audios.id"))
     t_value: Mapped[float] = mapped_column(Float, default=0.1, comment="温度参数")
     is_voice_mode: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否为语音模式: True(语音)/False(文本)")

@@ -18,8 +18,7 @@ import os
 from app.services.rag import process_uploaded_file
 from sqlalchemy import select
 from app.db.session import AsyncSessionLocal
-from app.db.models import SystemSetting, KnowledgeBase, Prompt
-
+from app.db.models import SystemSetting, KnowledgeBase, Prompt, VoiceModel, ReferAudio
 
 #实例化FastAPI对象
 app = FastAPI()
@@ -271,6 +270,77 @@ async def update_active_pb(body: dict):
         setting.active_prompt_id = int(prompt_id)
         await session.commit()
     return {"ok": True, "active_prompt_id": prompt_id}
+
+@app.get("/voice_models")
+async def list_voice_models():
+    """列出所有 GSV 语音模型，并返回当前激活的 active_model_id"""
+    async with AsyncSessionLocal() as session:
+        models = (await session.execute(select(VoiceModel))).scalars().all()
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        active_model_id = setting.active_model_id if setting else None
+    return {
+        "active_model_id": active_model_id,
+        "voice_models": [{"id": m.id, "name": m.name} for m in models],
+    }
+
+
+@app.put("/settings/active_model")
+async def update_active_model(body: dict):
+    """更新 system_settings 中的 active_model_id"""
+    model_id = body.get("model_id")
+    if not model_id:
+        raise HTTPException(status_code=400, detail="缺少 model_id")
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+        setting.active_model_id = int(model_id)
+        await session.commit()
+    return {"ok": True, "active_model_id": model_id}
+
+
+@app.get("/refer_audios")
+async def list_refer_audios():
+    """列出所有参考音频条目，并返回当前激活的 active_audio_id"""
+    async with AsyncSessionLocal() as session:
+        audios = (await session.execute(select(ReferAudio))).scalars().all()
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        active_audio_id = setting.active_audio_id if setting else None
+    return {
+        "active_audio_id": active_audio_id,
+        "refer_audios": [{"id": a.id, "name": a.name} for a in audios],
+    }
+
+
+@app.put("/settings/active_audio")
+async def update_active_audio(body: dict):
+    """更新 system_settings 中的 active_audio_id"""
+    audio_id = body.get("audio_id")
+    if not audio_id:
+        raise HTTPException(status_code=400, detail="缺少 audio_id")
+    async with AsyncSessionLocal() as session:
+        setting = (
+            await session.execute(
+                select(SystemSetting).where(SystemSetting.id == 1)
+            )
+        ).scalar_one_or_none()
+        if setting is None:
+            raise HTTPException(status_code=500, detail="system_settings 未初始化")
+        setting.active_audio_id = int(audio_id)
+        await session.commit()
+    return {"ok": True, "active_audio_id": audio_id}
 
 @app.get("/settings/t_value")
 async def get_t_value():

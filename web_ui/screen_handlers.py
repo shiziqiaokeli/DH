@@ -411,6 +411,69 @@ async def select_prompt(prompt_id_str: str | None) -> str:
     except httpx.ConnectError:
         return "🔌 无法连接后端"
 
+async def open_model_selector() -> tuple:
+    """拉取所有 GSV 模型及当前激活项，返回给 Radio 弹窗"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/voice_models")
+        if r.status_code != 200:
+            return gr.update(choices=[], value=None), gr.update(visible=True)
+        data = r.json()
+        choices = [(m["name"], str(m["id"])) for m in data["voice_models"]]
+        active = str(data["active_model_id"]) if data["active_model_id"] else None
+        return gr.update(choices=choices, value=active), gr.update(visible=True)
+    except httpx.ConnectError:
+        return gr.update(choices=[], value=None), gr.update(visible=True)
+
+
+async def select_model(model_id_str: str | None) -> str:
+    """选中某语音模型后，PUT 更新 system_settings.active_model_id"""
+    if not model_id_str:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.put(
+                f"{BASE}/settings/active_model",
+                json={"model_id": int(model_id_str)},
+            )
+        if r.status_code == 200:
+            return "✅ GSV 模型已切换"
+        return f"❌ 切换失败：{r.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接后端"
+
+
+async def open_audio_selector() -> tuple:
+    """拉取所有参考音频及当前激活项，返回给 Radio 弹窗"""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.get(f"{BASE}/refer_audios")
+        if r.status_code != 200:
+            return gr.update(choices=[], value=None), gr.update(visible=True)
+        data = r.json()
+        choices = [(a["name"], str(a["id"])) for a in data["refer_audios"]]
+        active = str(data["active_audio_id"]) if data["active_audio_id"] else None
+        return gr.update(choices=choices, value=active), gr.update(visible=True)
+    except httpx.ConnectError:
+        return gr.update(choices=[], value=None), gr.update(visible=True)
+
+
+async def select_audio(audio_id_str: str | None) -> str:
+    """选中某参考音频后，PUT 更新 system_settings.active_audio_id"""
+    if not audio_id_str:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_API) as client:
+            r = await client.put(
+                f"{BASE}/settings/active_audio",
+                json={"audio_id": int(audio_id_str)},
+            )
+        if r.status_code == 200:
+            return "✅ 参考音频已切换"
+        return f"❌ 切换失败：{r.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接后端"
+
 async def open_t_panel() -> tuple:
     """读取当前 t_value，打开温度输入面板"""
     try:
