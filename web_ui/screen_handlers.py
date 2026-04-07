@@ -576,3 +576,62 @@ async def voice_tts_if_needed(history: list, is_voice_mode: bool) -> dict:
         return gr.update(visible=False, value=None)
     except Exception:
         return gr.update(visible=False, value=None)
+
+def on_model_file_selected(file):
+    """用户选完音频后：暂存引用，显示模型名称输入框和确认按钮。"""
+    if file is None:
+        return (
+            None,
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+        )
+    return (
+        file,
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(
+            value="已选择音频，请填写模型名称后点击 **开始训练**。",
+            visible=True,
+        ),
+    )
+
+
+async def confirm_model_train(pending_file, model_name: str) -> str:
+    """第二步：带模型名称提交到后端，触发 GPT-SoVITS 训练流程。"""
+    if pending_file is None:
+        return "⚠️ 请先选择音频文件"
+    if not model_name or not model_name.strip():
+        return "⚠️ 请填写模型名称"
+    return await submit_model_train(pending_file, model_name)
+
+
+async def submit_model_train(file, model_name: str) -> str:
+    """向 /voice_models/train 发起 multipart POST，展示 task_id。"""
+    # exp_name 用英文：把中文名转为 UUID 前缀，保证 GPT-SoVITS 接受
+    import uuid as _uuid
+    exp_name = f"model_{_uuid.uuid4().hex[:8]}"
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            with open(file.name, "rb") as f:
+                filename = file.name.split("\\")[-1]
+                response = await client.post(
+                    f"{BASE}/voice_models/train",
+                    data={
+                        "model_name": model_name.strip(),
+                        "exp_name": exp_name,
+                    },
+                    files={"audio_file": (filename, f, "audio/wav")},
+                    timeout=None,
+                )
+        if response.status_code in (200, 202):
+            task_id = response.json().get("task_id", "?")
+            return (
+                f"✅ 训练任务已提交！task_id: `{task_id}`\n\n"
+                f"训练耗时较长，完成后模型「{model_name.strip()}」会自动出现在 GSV模型 列表中。"
+            )
+        return f"❌ 提交失败：{response.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接到后端服务器"
+    except Exception as e:
+        return f"❌ 异常：{str(e)}"

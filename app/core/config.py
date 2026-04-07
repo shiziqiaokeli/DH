@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     VECTOR_DB_PATH: str 
 
     # 6. GPT-SOVITS配置
-    GPT_SOVITS_URL: str
+    TTS_URL: str
+    TRAIN_URL: str
 
     # 使用 Pydantic 的 SettingsConfigDict 自动读取 .env
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8')

@@ -29,6 +29,8 @@ from screen_handlers import (
     get_voice_mode_label,
     toggle_voice_mode,
     voice_tts_if_needed,
+    on_model_file_selected,
+    confirm_model_train,
 )
 _CSS_PATH = Path(__file__).resolve().parent / "styles" / "screen.css"
 SCREEN_CSS = _CSS_PATH.read_text(encoding="utf-8")
@@ -88,7 +90,24 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                 )
                 prompt_status = gr.Markdown("", visible=False)
 
-                new_model_btn = gr.Button("训练GSV模型", variant="secondary", size="lg")
+                new_model_btn = gr.UploadButton(
+                    "训练GSV模型",
+                    variant="secondary",
+                    size="lg",
+                    file_count="single",
+                    file_types=[".wav", ".mp3", ".flac", ".m4a"],
+                )
+                pending_model_file = gr.State(value=None)
+                model_name_input = gr.Textbox(
+                    label="",
+                    placeholder="给模型起个名字",
+                    show_label=False,
+                    visible=False,
+                )
+                confirm_model_train_btn = gr.Button(
+                    "开始训练", variant="secondary", size="lg", visible=False
+                )
+                model_train_status = gr.Markdown("", visible=False)
 
                 new_audio_btn = gr.Button("上传参考音频", variant="secondary", size="lg")
 
@@ -310,7 +329,27 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
     ).then(
         fn=lambda: gr.update(visible=True),
         outputs=[rag_status],
-    )   
+    )
+    new_model_btn.upload(
+        fn=on_model_file_selected,
+        inputs=[new_model_btn],
+        outputs=[
+            pending_model_file,
+            model_name_input,
+            confirm_model_train_btn,
+            model_train_status,
+        ],
+        queue=False,
+    )
+    confirm_model_train_btn.click(
+        fn=confirm_model_train,
+        inputs=[pending_model_file, model_name_input],
+        outputs=[model_train_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[model_train_status],
+    ) 
     new_prompt_btn.click(
         fn=on_prompt_form_open,
         inputs=None,

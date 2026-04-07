@@ -20,6 +20,7 @@ from sqlalchemy import select
 from app.db.session import AsyncSessionLocal
 from app.db.models import SystemSetting, KnowledgeBase, Prompt, VoiceModel, ReferAudio
 import httpx
+import uuid as uuid_lib
 
 #实例化FastAPI对象
 app = FastAPI()
@@ -314,7 +315,7 @@ async def update_active_model(body: dict):
         if model is None:
             raise HTTPException(status_code=404, detail="未找到该语音模型")
 
-    gsv_base = settings.GPT_SOVITS_URL
+    gsv_base = settings.TTS_URL
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             gpt_r = await client.get(
@@ -458,7 +459,7 @@ async def tts_proxy(text: str) -> StreamingResponse:
         raise HTTPException(status_code=400, detail="text 不能为空")
 
     audio = await get_active_refer_audio()
-    gsv_base = settings.GPT_SOVITS_URL
+    gsv_base = settings.TTS_URL
 
     params = {
         "text": text,
@@ -486,6 +487,97 @@ async def tts_proxy(text: str) -> StreamingResponse:
             pass
 
     return StreamingResponse(audio_generator(), media_type="audio/wav")
+
+@app.post("/voice_models/train")
+async def start_voice_model_train(
+    model_name: str = Form(..., description="模型在系统中的显示名称"),
+    audio_file: UploadFile = File(..., description="训练用原始音频"),
+    exp_name:   str = Form(..., description="实验名（英文+下划线）"),
+):
+    """
+    接收前端上传的音频和模型名称，转发到 GPT-SoVITS /train/start_with_asr。
+    立即返回 task_id，训练结果需通过 /voice_models/train/status/{task_id} 轮询。
+    """
+    gsv_base = settings.TRAIN_URL
+    audio_bytes = await audio_file.read()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{gsv_base}/train/start_with_asr",
+                data={
+                    "exp_name":   exp_name.strip().replace(" ", "_"),
+                    "version":    "v2Pro",
+                    "gpu_numbers": "0",
+                    "asr_model":  "Faster Whisper (多语种)",
+                    "asr_model_size": "large-v3",
+                    "asr_lang":   "zh",
+                    "sovits_epoch": 2,
+                    "sovits_save_every": 1,
+                    "gpt_epoch":  2,
+                    "gpt_save_every": 1,
+                    "batch_size": 2,
+                    "if_save_latest": True,
+                    "if_save_every_weights": True,
+                    # model_name 不是 GPT-SoVITS 的字段，我们额外带过去做上下文记录
+                },
+                files={"audio_file": (audio_file.filename, audio_bytes, audio_file.content_type)},
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="无法连接到 GPT-SoVITS 训练服务")
+    if resp.status_code not in (200, 202):
+        raise HTTPException(status_code=502, detail=f"训练服务拒绝请求: {resp.text}")
+    task_id = resp.json().get("task_id")
+    # 将 task_id → model_name + exp_name 的映射存入 Redis，供轮询时使用
+    await redis_client.hset(
+        "dh:train_tasks",
+        task_id,
+        f"{model_name}||{exp_name.strip().replace(' ', '_')}",
+    )
+    return {"task_id": task_id, "message": "训练任务已提交"}
+
+@app.get("/voice_models/train/status/{task_id}")
+async def poll_train_status(task_id: str):
+    """
+    转发轮询到 GPT-SoVITS /train/status/{task_id}。
+    若训练完成且 DB 中尚无该记录，则自动写入 voice_models 表。
+    """
+    gsv_base = settings.TRAIN_URL
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(f"{gsv_base}/train/status/{task_id}")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="无法连接到 GPT-SoVITS 训练服务")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=resp.text)
+
+    data = resp.json()
+    status   = data.get("status")      # "pending" / "running" / "done" / "error"
+    gpt_path    = data.get("gpt_path")
+    sovits_path = data.get("sovits_path")
+
+    # 训练完成，且路径都有值时，自动写入 DB（只写一次）
+    if status == "done" and gpt_path and sovits_path:
+        meta_raw = await redis_client.hget("dh:train_tasks", task_id)
+        if meta_raw:
+            meta = (meta_raw.decode() if isinstance(meta_raw, bytes) else meta_raw)
+            model_name, exp_name = meta.split("||", 1)
+            async with AsyncSessionLocal() as session:
+                # 防重复写入
+                exists = (await session.execute(
+                    select(VoiceModel).where(VoiceModel.name == model_name)
+                )).scalar_one_or_none()
+                if not exists:
+                    session.add(VoiceModel(
+                        name=model_name,
+                        pth_path=sovits_path,
+                        ckpt_path=gpt_path,
+                    ))
+                    await session.commit()
+            # 写完后删掉 Redis 里的临时记录
+            await redis_client.hdel("dh:train_tasks", task_id)
+
+    return data   # 原样透传 GPT-SoVITS 返回的完整状态
 
 if __name__ == "__main__":
     import uvicorn
