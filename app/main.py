@@ -352,6 +352,68 @@ async def list_refer_audios():
         "refer_audios": [{"id": a.id, "name": a.name} for a in audios],
     }
 
+@app.post("/refer_audios")
+async def create_refer_audio(
+    name: str = Form(..., description="参考音频的显示名称"),
+    ref_text: str = Form(..., description="与音频内容一致的参考文本"),
+    audio_file: UploadFile = File(..., description="音频文件（wav/mp3/flac 等）"),
+):
+    """
+    将音频转发到 GPT-SoVITS /upload_refer_audio 保存，
+    取回绝对路径后写入本地 refer_audios 表。
+    """
+    if not name or not name.strip():
+        raise HTTPException(status_code=400, detail="name 不能为空")
+    if not ref_text or not ref_text.strip():
+        raise HTTPException(status_code=400, detail="ref_text 不能为空")
+
+    audio_bytes = await audio_file.read()
+    gsv_base = settings.TTS_URL
+
+    # 第一步：转发到 GPT-SoVITS，获取文件落盘的绝对路径
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                f"{gsv_base}/upload_refer_audio",
+                files={
+                    "refer_audio_file": (
+                        audio_file.filename,
+                        audio_bytes,
+                        audio_file.content_type or "audio/wav",
+                    )
+                },
+            )
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="无法连接到 GPT-SoVITS 服务")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"GPT-SoVITS 上传失败: {resp.text}")
+
+    audio_path = resp.json().get("path")
+    if not audio_path:
+        raise HTTPException(status_code=502, detail="GPT-SoVITS 未返回有效路径")
+
+    # 第二步：写入本地 refer_audios 表
+    async with AsyncSessionLocal() as session:
+        # 防止 name 重复导致唯一索引冲突
+        exists = (
+            await session.execute(
+                select(ReferAudio).where(ReferAudio.name == name.strip())
+            )
+        ).scalar_one_or_none()
+        if exists:
+            raise HTTPException(status_code=409, detail=f"名称「{name.strip()}」已存在")
+
+        audio = ReferAudio(
+            name=name.strip(),
+            audio_path=audio_path,
+            text=ref_text.strip(),
+        )
+        session.add(audio)
+        await session.commit()
+        await session.refresh(audio)
+
+    return {"id": audio.id, "name": audio.name, "audio_path": audio.audio_path}
 
 @app.put("/settings/active_audio")
 async def update_active_audio(body: dict):

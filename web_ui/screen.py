@@ -31,6 +31,8 @@ from screen_handlers import (
     voice_tts_if_needed,
     on_model_file_selected,
     confirm_model_train,
+    on_audio_file_selected,   # 新增
+    confirm_audio_upload,     # 新增
 )
 _CSS_PATH = Path(__file__).resolve().parent / "styles" / "screen.css"
 SCREEN_CSS = _CSS_PATH.read_text(encoding="utf-8")
@@ -108,8 +110,30 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
                     "开始训练", variant="secondary", size="lg", visible=False
                 )
                 model_train_status = gr.Markdown("", visible=False)
-
-                new_audio_btn = gr.Button("上传参考音频", variant="secondary", size="lg")
+                new_audio_btn = gr.UploadButton(
+                    "上传参考音频",
+                    variant="secondary",
+                    size="lg",
+                    file_count="single",
+                    file_types=[".wav", ".mp3", ".flac", ".m4a"],
+                )
+                pending_audio_file = gr.State(value=None)
+                audio_ref_text_input = gr.Textbox(
+                    label="",
+                    placeholder="输入参考文本（与音频内容一致）",
+                    show_label=False,
+                    visible=False,
+                )
+                audio_name_input = gr.Textbox(
+                    label="",
+                    placeholder="给参考音频起个名字",
+                    show_label=False,
+                    visible=False,
+                )
+                confirm_audio_upload_btn = gr.Button(
+                    "确认上传", variant="secondary", size="lg", visible=False
+                )
+                audio_upload_status = gr.Markdown("", visible=False)
 
                 gr.Markdown("""<div style="font-size: 16px; font-weight: 600; padding: 0;text-align: center;">
                 对话
@@ -365,6 +389,27 @@ with gr.Blocks(title="AI应用中台",fill_width=True) as demo:
         fn=lambda: gr.update(visible=True),
         outputs=[prompt_status],
     ) 
+    new_audio_btn.upload(
+        fn=on_audio_file_selected,
+        inputs=[new_audio_btn],
+        outputs=[
+            pending_audio_file,
+            audio_ref_text_input,
+            audio_name_input,
+            confirm_audio_upload_btn,
+            audio_upload_status,
+        ],
+        queue=False,
+    )
+    confirm_audio_upload_btn.click(
+        fn=confirm_audio_upload,
+        inputs=[pending_audio_file, audio_ref_text_input, audio_name_input],
+        outputs=[audio_upload_status],
+        queue=False,
+    ).then(
+        fn=lambda: gr.update(visible=True),
+        outputs=[audio_upload_status],
+    )
     change_rag_btn.click(
         fn=open_kb_selector,
         inputs=None,

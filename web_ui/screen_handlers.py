@@ -635,3 +635,61 @@ async def submit_model_train(file, model_name: str) -> str:
         return "🔌 无法连接到后端服务器"
     except Exception as e:
         return f"❌ 异常：{str(e)}"
+
+def on_audio_file_selected(file):
+    """用户选完参考音频后：暂存引用，显示参考文本框、名称框和确认按钮。"""
+    if file is None:
+        return (
+            None,
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+        )
+    return (
+        file,
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(
+            value="已选择音频，请填写参考文本和名称后点击 **确认上传**。",
+            visible=True,
+        ),
+    )
+
+
+async def confirm_audio_upload(
+    pending_file, ref_text: str, audio_name: str
+) -> str:
+    """校验输入，调用后端上传参考音频接口。"""
+    if pending_file is None:
+        return "⚠️ 请先选择音频文件"
+    if not ref_text or not ref_text.strip():
+        return "⚠️ 请填写参考文本"
+    if not audio_name or not audio_name.strip():
+        return "⚠️ 请填写参考音频名称"
+    return await _submit_refer_audio(pending_file, ref_text, audio_name)
+
+
+async def _submit_refer_audio(file, ref_text: str, audio_name: str) -> str:
+    """向 /refer_audios 发起 multipart POST。"""
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            with open(file.name, "rb") as f:
+                filename = file.name.split("\\")[-1]
+                response = await client.post(
+                    f"{BASE}/refer_audios",
+                    data={
+                        "name": audio_name.strip(),
+                        "ref_text": ref_text.strip(),
+                    },
+                    files={"audio_file": (filename, f, "audio/wav")},
+                    timeout=None,
+                )
+        if response.status_code in (200, 201):
+            return f"✅ 参考音频「{audio_name.strip()}」上传成功"
+        return f"❌ 上传失败：{response.text}"
+    except httpx.ConnectError:
+        return "🔌 无法连接到后端服务器"
+    except Exception as e:
+        return f"❌ 异常：{str(e)}"
