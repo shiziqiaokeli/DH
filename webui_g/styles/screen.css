@@ -1,0 +1,209 @@
+/*强制容器占满全宽，并去除内边距*/
+.gradio-container { 
+    max-width: 100% !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+}
+/*移除内部主布局的默认间距*/
+.main {
+    padding: 0 !important;
+}
+/*左侧框架：浅灰色背景，无边框*/
+#leftside {
+    background-color: #f0f4f9; 
+    padding: 20px 15px;
+    height: 100vh;
+}
+/*右侧框架：设为相对定位，方便内部绝对定位*/
+#rightside {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+/*顶部悬浮导航*/
+#top-nav {
+    position: absolute;
+    top: 15px;
+    left: 0;
+    width: 100%;             
+    padding: 0 20px;        
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;     
+    z-index: 1000;
+    box-sizing: border-box;  
+}
+/*统一子项宽度，确保中间内容真正处于物理中心*/
+.nav-item {
+    flex: 1; 
+}
+.nav-center {
+    text-align: center;
+}
+.nav-right {
+    display: flex;
+    justify-content: flex-end;
+}
+#mini-btn {
+    flex: 0 0 auto !important; 
+    width: fit-content !important; 
+    min-width: 0 !important;
+    padding: 2px 10px !important; 
+    align-self: center; 
+}
+/*居中且变窄的限制容器*/
+#center-container {
+    max-width: 850px; 
+    margin: 0 auto;   
+    height: 100vh;
+    display: block;
+    position: relative; 
+}
+/*聊天框占满高度，沉入底层*/
+#chat-window {
+    height: 100% !important;
+    padding-top: 80px !important; 
+    padding-bottom: 200px !important; 
+    border: none !important;
+    background: transparent !important;
+}
+/*绝对定位的悬浮输入区域*/
+#input-wrapper {
+    position: absolute;
+    bottom: 25px; 
+    left: 0;
+    width: 100%;
+    z-index: 999; 
+}
+#input-card {
+    background-color: #f0f4f9;
+    border-radius: 24px;
+    padding: 10px 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+/*more下拉锚点：只占按钮宽度，供子菜单absolute参照*/
+#more-menu-anchor {
+    position: relative !important;
+    width: fit-content !important;
+    flex: 0 0 auto !important;
+    align-self: center;
+    min-width: 0 !important;
+}
+/*悬浮在按钮下方，不撑开顶栏Row*/
+#more-menu-dropdown {
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    margin-top: 6px !important;
+    z-index: 1001 !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: max-content !important;
+    min-width: 140px;
+    padding: 8px !important;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+/* 重命名弹窗遮罩层 */
+#rename-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+#rename-overlay > div {
+    flex: 0 0 auto !important;
+    align-self: center !important;
+    min-height: 0 !important;
+    height: auto !important;
+}
+#rename-card {
+    background: #ffffff !important;
+    border-radius: 16px !important;
+    padding: 24px 32px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    width: 400px !important;
+    max-width: 90vw !important;
+    flex: 0 0 auto !important;
+    max-height: 90vh !important;
+}
+#rename-title {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin-bottom: 16px !important;
+    text-align: center !important;
+    color: #1a1a1a !important;
+}
+#rename-input input {
+    font-size: 14px !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    border: 1px solid #d1d5db !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-bottom: 20px !important;
+}
+#rename-buttons {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 12px !important;
+}
+.rename-btn {
+    flex: 0 0 auto !important;
+    min-width: 80px !important;
+    padding: 8px 20px !important;
+}
+/*KB选择器锚点：提供absolute定位参照，本身不占额外高度*/
+#kb-selector-anchor {
+    position: relative !important;
+    width: fit-content !important;
+    flex: 0 0 auto !important;
+    align-self: center;
+    min-width: 0 !important;
+}
+/*向上弹出的知识库选择面板*/
+#kb-selector-panel {
+    position: absolute !important;
+    bottom: 100% !important;          
+    left: 0 !important;
+    margin-bottom: 8px !important;    
+    z-index: 2000 !important;
+    width: max-content !important;
+    min-width: 160px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 10px !important;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12); 
+}
+#input-card {
+    overflow: visible !important;
+}
+#t-selector-anchor {
+    position: relative !important;
+    width: fit-content !important;
+    flex: 0 0 auto !important;
+    align-self: center;
+    min-width: 0 !important;
+}
+#t-selector-panel {
+    position: absolute !important;
+    bottom: 100% !important;
+    left: 0 !important;
+    margin-bottom: 8px !important;
+    z-index: 2000 !important;
+    width: 200px;
+    padding: 12px !important;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
+}

@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.core.config import settings
 
 #创建异步引擎
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+engine = create_async_engine(settings.DATABASE_URL, echo=False)
 #创建会话工厂
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

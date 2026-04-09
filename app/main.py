@@ -238,6 +238,33 @@ async def update_active_kb(body: dict):
         await session.commit()
     return {"ok": True, "active_kb_id": kb_id}
 
+@app.post("/prompts")
+async def create_prompt(
+    prompt_name: str = Form(..., description="提示词显示名称"),
+    prompt_body: str = Form(..., description="提示词正文内容"),
+):
+    """新建一条提示词，写入 MySQL prompts 表"""
+    if not prompt_name or not prompt_name.strip():
+        raise HTTPException(status_code=400, detail="prompt_name 不能为空")
+    if not prompt_body or not prompt_body.strip():
+        raise HTTPException(status_code=400, detail="prompt_body 不能为空")
+
+    async with AsyncSessionLocal() as session:
+        exists = (
+            await session.execute(
+                select(Prompt).where(Prompt.name == prompt_name.strip())
+            )
+        ).scalar_one_or_none()
+        if exists:
+            raise HTTPException(status_code=409, detail=f"名称「{prompt_name.strip()}」已存在")
+
+        p = Prompt(name=prompt_name.strip(), content=prompt_body.strip())
+        session.add(p)
+        await session.commit()
+        await session.refresh(p)
+
+    return {"id": p.id, "name": p.name}
+
 @app.get("/prompts")
 async def list_prompts():
     """列出所有提示词，并返回当前激活的 active_prompt_id"""
