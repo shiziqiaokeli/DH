@@ -12,7 +12,6 @@ from app.core.custom_embed import CustomQwenEmbeddings
 from app.core.config import settings
 #文本向量化后存入向量数据库
 import os
-from app.core.config import settings
 from langchain_chroma import Chroma
 #初始化大模型
 from langchain_openai import ChatOpenAI
@@ -144,7 +143,6 @@ class RAGService:
         qa_system_prompt: str, 
         prompt_id: int, 
         temperature: float,
-        is_voice_mode: bool,
         ):
         chain = get_chain(
             collection_name, 
