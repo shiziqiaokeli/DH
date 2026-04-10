@@ -4,44 +4,37 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
-#知识库
-class KnowledgeBase(Base):
+class KnowledgeBase(Base):   #知识库
     __tablename__ = "knowledge_bases"
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, comment="用户自定义名称")
     collection_name: Mapped[str] = mapped_column(String(100), comment="向量数据库中的Collection名")
-#提示词
 class Prompt(Base):
-    __tablename__ = "prompts"
+    __tablename__ = "prompts"   #提示词
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, comment="用户自定义名称")
     content: Mapped[str] = mapped_column(Text, comment="系统提示词正文")
-#语音模型
 class VoiceModel(Base):
-    __tablename__ = "voice_models"
+    __tablename__ = "voice_models"   #语音模型
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, comment="用户自定义名称")
     pth_path: Mapped[str] = mapped_column(String(255), comment="sovits模型路径")
     ckpt_path: Mapped[str] = mapped_column(String(255), comment="gpt模型路径")
-#参考音频
 class ReferAudio(Base):
-    __tablename__ = "refer_audios"
+    __tablename__ = "refer_audios"   #参考音频
     
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True, comment="用户自定义名称")
     audio_path: Mapped[str] = mapped_column(String(255), comment="参考音频路径")
     text: Mapped[str] = mapped_column(String(255), comment="参考文本")
-#全局活跃配置 (单例模式)
-class SystemSetting(Base):
+class SystemSetting(Base):   #全局活跃配置 (单例模式)
     __tablename__ = "system_settings"
     
-    #固定id=1，确保全系统只有一套活跃配置
-    id: Mapped[int] = mapped_column(primary_key=True, default=1)
-    #关联外键：直接绑定到上面三张表的主键
-    active_kb_id: Mapped[int] = mapped_column(ForeignKey("knowledge_bases.id"))
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)   #固定id=1，确保全系统只有一套活跃配置
+    active_kb_id: Mapped[int] = mapped_column(ForeignKey("knowledge_bases.id"))   #关联外键：直接绑定到上面四张表的主键
     active_prompt_id: Mapped[int] = mapped_column(ForeignKey("prompts.id"))
     active_model_id: Mapped[int] = mapped_column(ForeignKey("voice_models.id"))
     active_audio_id: Mapped[int] = mapped_column(ForeignKey("refer_audios.id"))

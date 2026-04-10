@@ -21,19 +21,18 @@ class Settings(BaseSettings):
     #5.GPT-SOVITS
     TTS_URL: str
     TRAIN_URL: str
-
-    #使用Pydantic的SettingsConfigDict自动读取.env
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding='utf-8')
-    #动态合成MySQL URL(异步驱动使用aiomysql)
-    @computed_field
+ 
+    model_config = SettingsConfigDict(   #使用Pydantic的SettingsConfigDict自动读取.env
+        env_file=".env", 
+        env_file_encoding='utf-8',
+        )
+    @computed_field   #动态合成MySQL URL(异步驱动使用aiomysql)
     @property
     def DATABASE_URL(self) -> str:
         return f"mysql+aiomysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-    #动态合成Redis URL
-    @computed_field
+    @computed_field   #动态合成Redis URL
     @property
     def REDIS_URL(self) -> str:
         auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
         return f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-#实例化全局配置对象
-settings = Settings()
+settings = Settings()   #实例化全局配置对象
