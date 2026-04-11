@@ -1,6 +1,8 @@
 from app.core.config import settings#导入配置文件
 from app.core.custom_embed import CustomQwenEmbeddings#导入自定义向量模型（api）
 from langchain_huggingface import HuggingFaceEmbeddings#导入向量模型（本地）
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder#导入重排器模型
+from langchain_classic.retrievers.document_compressors import CrossEncoderReranker#导入重排器
 from langchain_community.document_loaders import TextLoader#初始化加载器
 from langchain_text_splitters import RecursiveCharacterTextSplitter#初始化分割器
 import uuid#生成唯一uuid
@@ -10,6 +12,9 @@ from langchain_openai import ChatOpenAI#初始化大模型（api）
 from langchain_ollama import ChatOllama#初始化大模型（本地）
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder#导入提示词拼接工具和记忆区模块
 from langchain_community.chat_message_histories import RedisChatMessageHistory#导入Redis会话历史模块
+from langchain_core.documents import Document#导入Document对象
+from langchain_community.retrievers import BM25Retriever#导入BM25检索器
+from langchain_classic.retrievers import EnsembleRetriever,ContextualCompressionRetriever#导入多路融合检索器，上下文压缩检索器
 from langchain_classic.chains import create_history_aware_retriever#构建有记忆的检索器（水龙头）
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain#接受前面所有chain的输出作为context（排水口）
 from langchain_classic.chains import create_retrieval_chain#规定两个chain的协议（水管）
@@ -24,7 +29,16 @@ embeddings = CustomQwenEmbeddings(   #初始化向量模型（api）
     model="text-embedding-v3",
 )
 '''
-embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-zh-v1.5")   #初始化向量模型（本地）
+embeddings = HuggingFaceEmbeddings(   #初始化向量模型（本地）
+    model_name="BAAI/bge-m3",
+    model_kwargs={"device": "cpu"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
+    encode_kwargs={"normalize_embeddings": True},
+)
+_reranker_model = HuggingFaceCrossEncoder(   #初始化重排器模型
+    model_name="BAAI/bge-reranker-v2-m3",
+    model_kwargs={"device": "cpu"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
+)
+reranker = CrossEncoderReranker(model=_reranker_model, top_n=5)   #初始化重排器
 
 async def process_uploaded_file(file_path: str) -> str:   #将上传的文件用向量模型切分并存入到向量数据库
     loader = TextLoader(file_path, encoding="utf-8")   #通过路径和编码方式初始化加载器
@@ -88,15 +102,29 @@ def _build_chain(   #构建完整的chain
     temperature: float
     ) -> RunnableWithMessageHistory:   
     llm = _make_llm(temperature)
-    db = Chroma(
+    db = Chroma(   #稠密检索：Chroma向量库
         collection_name=collection_name,
         embedding_function=embeddings,
         persist_directory=db_path,
     )
-    retriever = db.as_retriever(search_kwargs={"k": 5})   #通过相似度检索出相似度最高的k个资料（Top-K）
+    dense_retriever = db.as_retriever(search_kwargs={"k": 20})  
+    raw = db.get(include=["documents", "metadatas"])   #稀疏检索：从Chroma取出全部原始文本，构建 BM25
+    bm25_docs = [
+        Document(page_content=text, metadata=meta)
+        for text, meta in zip(raw["documents"], raw["metadatas"])
+    ]
+    bm25_retriever = BM25Retriever.from_documents(bm25_docs, k=20)
+    ensemble_retriever = EnsembleRetriever(   #多路融合：RRF（倒数排名融合），权重各0.5
+        retrievers=[dense_retriever, bm25_retriever],
+        weights=[0.5, 0.5],
+    )
+    compression_retriever = ContextualCompressionRetriever(   #精排：BGE-Reranker压缩到top-5
+        base_compressor=reranker,
+        base_retriever=ensemble_retriever,
+    )
     history_aware_retriever = create_history_aware_retriever(   #构建有记忆的检索器（水龙头）
         llm, 
-        retriever, 
+        compression_retriever, 
         transform_prompt,   #把transform_prompt喂给llm得到转化后的问题，把转化后的问题通过retriever先向量化再检索出相似度最高的k个资料传给下一个chain
     )
     qa_prompt = ChatPromptTemplate.from_messages([   #构建回答问题所用的提示词，把系统提示词，记忆区，用户问题拼接起来
@@ -141,6 +169,7 @@ class RAGService:
         qa_system_prompt: str, 
         prompt_id: int, 
         temperature: float,
+        is_voice_mode: bool,   #main函数有校验，不能删除
         ):
         chain = get_chain(
             collection_name, 
