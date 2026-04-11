@@ -7,7 +7,7 @@ class CustomQwenEmbeddings(Embeddings):   #自定义Embedding类，彻底剥离L
         self, 
         api_key: str, 
         base_url: str, 
-        model: str = "text-embedding-v1",   #向量模型名称
+        model: str = "text-embedding-v3",   #向量模型名称
         ):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
