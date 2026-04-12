@@ -31,12 +31,12 @@ embeddings = CustomQwenEmbeddings(   #初始化向量模型（api）
 '''
 embeddings = HuggingFaceEmbeddings(   #初始化向量模型（本地）
     model_name="BAAI/bge-m3",
-    model_kwargs={"device": "cpu"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
+    model_kwargs={"device": "cuda"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
     encode_kwargs={"normalize_embeddings": True},
 )
 _reranker_model = HuggingFaceCrossEncoder(   #初始化重排器模型
     model_name="BAAI/bge-reranker-v2-m3",
-    model_kwargs={"device": "cpu"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
+    model_kwargs={"device": "cuda"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
 )
 reranker = CrossEncoderReranker(model=_reranker_model, top_n=5)   #初始化重排器
 
