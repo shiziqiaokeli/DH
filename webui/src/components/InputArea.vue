@@ -143,8 +143,8 @@ const voiceLabel = () => store.isVoiceMode ? '语音输出' : '文本输出'
         <div class="anchor">
           <button class="mini-btn" @click="togglePanel('t')">T</button>
           <div v-if="activePanel === 't'" class="popup-panel" style="width:200px">
-            <label class="panel-label">温度参数 (&gt;0)</label>
-            <input v-model.number="tValue" type="number" step="0.1" min="0.01" class="num-input" />
+            <label class="panel-label">温度参数 (≥0)</label>
+            <input v-model.number="tValue" type="number" step="0.1" min="0" class="num-input" />
             <p v-if="tStatus" class="pstatus">{{ tStatus }}</p>
             <div style="display:flex;gap:8px;margin-top:8px">
               <button class="btn-sm primary" @click="saveT">保存</button>

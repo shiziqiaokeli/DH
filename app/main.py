@@ -484,7 +484,7 @@ async def get_t_value():
             raise HTTPException(status_code=500, detail="system_settings 未初始化")
     return {"t_value": float(setting.t_value)}
 
-@app.put("/settings/t_value")   #更新温度参数，必须为正浮点数
+@app.put("/settings/t_value")   #更新温度参数，必须为非负浮点数
 async def update_t_value(body: dict):
     t_val = body.get("t_value")
     if t_val is None:
