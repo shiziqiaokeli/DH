@@ -1,16 +1,17 @@
+#!/bin/sh
 echo "=========================================="
 echo " RAG 评测流水线启动 (pre-push)"
 echo "=========================================="
-#Git pre-push hook：运行RAG评测，指标回归则拒绝push
-cd "$(git rev-parse --show-toplevel)"   #进入项目根目录
-PYTHON=${PYTHON:-python}   #检测Python可执行文件
-if [ ! -f tests/eval/testset.json ];   #检查测试集是否存在
+# Git pre-push hook：运行 RAG 评测，指标回归则拒绝 push
+cd "$(git rev-parse --show-toplevel)" || exit 1
+PYTHON=${PYTHON:-python}
+if [ ! -f tests/eval/testset.json ]; then
     echo "[WARN] 未找到测试集 tests/eval/testset.json，跳过评测"
     exit 0
 fi
-$PYTHON -m tests.eval.eval_runner   #运行评测
+$PYTHON -m tests.eval.eval_runner
 EXIT_CODE=$?
-if [ $EXIT_CODE -ne 0 ]; 
+if [ "$EXIT_CODE" -ne 0 ]; then
     echo ""
     echo "=========================================="
     echo " PUSH 被拒绝: RAG 质量指标回归"
