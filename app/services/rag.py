@@ -34,18 +34,20 @@ embeddings = HuggingFaceEmbeddings(   #初始化向量模型（本地）
     model_kwargs={"device": "cuda"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
     encode_kwargs={"normalize_embeddings": True},
 )
+embeddings._client.half()   #转fp16，显存吃紧
 _reranker_model = HuggingFaceCrossEncoder(   #初始化重排器模型
     model_name="BAAI/bge-reranker-v2-m3",
     model_kwargs={"device": "cuda"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
 )
-reranker = CrossEncoderReranker(model=_reranker_model, top_n=5)   #初始化重排器
+_reranker_model.client.model.half()   #转fp16，显存吃紧
+reranker = CrossEncoderReranker(model=_reranker_model, top_n=8)   #初始化重排器
 
 async def process_uploaded_file(file_path: str) -> str:   #将上传的文件用向量模型切分并存入到向量数据库
     loader = TextLoader(file_path, encoding="utf-8")   #通过路径和编码方式初始化加载器
     documents = loader.load()   #调用加载器的load方法获取资料
     splitter = RecursiveCharacterTextSplitter(   #初始化分割器
-        chunk_size=300,   #每块包含的最大字符数
-        chunk_overlap=30,   #相邻两块之间重叠的字符数
+        chunk_size=200,   #每块包含的最大字符数
+        chunk_overlap=100,   #相邻两块之间重叠的字符数
         separators=["\n\n", "\n", "。", "！", "？", "；", "，", ",", " ", ""],   #分隔符（控制切分优先级，从左到右依次切分，直到chunk_size<300）
     )
     chunks = splitter.split_documents(documents)   #调用分割器的split_documents方法分割资料
@@ -116,7 +118,7 @@ def _build_chain(   #构建完整的chain
     bm25_retriever = BM25Retriever.from_documents(bm25_docs, k=20)
     ensemble_retriever = EnsembleRetriever(   #多路融合：RRF（倒数排名融合），权重各0.5
         retrievers=[dense_retriever, bm25_retriever],
-        weights=[0.5, 0.5],
+        weights=[0.3, 0.7],
     )
     compression_retriever = ContextualCompressionRetriever(   #精排：BGE-Reranker压缩到top-5
         base_compressor=reranker,

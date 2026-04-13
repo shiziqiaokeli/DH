@@ -1,0 +1,9 @@
+{
+  "ragas_context_precision": 0.6646296295870584,
+  "ragas_context_recall": 0.785,
+  "ragas_faithfulness": 0.48738095238095236,
+  "deepeval_hallucination": 0.14,
+  "deepeval_contextual_precision": 0.7673148148148149,
+  "deepeval_answer_relevancy": 0.7873809523809524,
+  "threshold_drop": 0.05
+}

@@ -1,0 +1,5 @@
+ragas>=0.2
+deepeval>=2.0
+datasets
+pytest
+pytest-asyncio
