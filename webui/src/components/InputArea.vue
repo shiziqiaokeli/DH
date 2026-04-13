@@ -68,7 +68,7 @@ async function selectPrompt(id) {
   promptStatus.value = '✅ 提示词已切换'
 }
 async function saveT() {
-  if (tValue.value <= 0) { tStatus.value = '⚠️ 温度必须大于 0'; return }
+  if (tValue.value < 0) { tStatus.value = '⚠️ 温度必须大于等于 0'; return }
   await api.setTemperature(tValue.value)
   tStatus.value = `✅ 温度已设为 ${tValue.value}`
 }

@@ -493,8 +493,8 @@ async def update_t_value(body: dict):
         t_val = float(t_val)
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="t_value 必须为数字")
-    if t_val <= 0:
-        raise HTTPException(status_code=400, detail="t_value 必须大于 0")
+    if t_val < 0:
+        raise HTTPException(status_code=400, detail="t_value 必须大于等于 0")
     async with AsyncSessionLocal() as session:
         setting = (
             await session.execute(
