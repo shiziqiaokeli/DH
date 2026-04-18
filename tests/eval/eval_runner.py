@@ -213,7 +213,7 @@ def run_ragas_eval(results: list[dict]) -> dict[str, float]:   #使用RAGAS框�
         ],
         llm=eval_judge_llm,
         embeddings=eval_judge_embeddings,
-        run_config=RunConfig(max_workers=1, max_wait=300),  # 限制并发
+        run_config=RunConfig(max_workers=5, max_wait=300),  # 限制并发
     )
     return {
         "ragas_context_precision": _safe_mean(score["context_precision"]),  #检索内容精度
