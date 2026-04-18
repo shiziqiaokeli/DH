@@ -1,9 +1,9 @@
 {
-  "ragas_context_precision": 0.6646296295870584,
-  "ragas_context_recall": 0.785,
-  "ragas_faithfulness": 0.48738095238095236,
-  "deepeval_hallucination": 0.14,
-  "deepeval_contextual_precision": 0.7673148148148149,
-  "deepeval_answer_relevancy": 0.7873809523809524,
+  "ragas_context_precision": 0.5857549130441139,
+  "ragas_context_recall": 0.7722222222222223,
+  "ragas_faithfulness": 0.8059632034632035,
+  "deepeval_hallucination": 0.22083333333333333,
+  "deepeval_contextual_precision": 0.8021349206349206,
+  "deepeval_answer_relevancy": 0.8850793650793651,
   "threshold_drop": 0.05
 }

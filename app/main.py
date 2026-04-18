@@ -1,9 +1,13 @@
+'''
+$env:HF_HUB_OFFLINE = "1"
+$env:TRANSFORMERS_OFFLINE = "1"
+'''
 from fastapi import FastAPI,HTTPException,UploadFile,File,Form
 from app.services.rag import RAGService,get_session_history,process_uploaded_file
 from redis import asyncio as aioredis
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
-from sqlalchemy import select
+from sqlalchemy import false, select
 from app.db.models import SystemSetting,KnowledgeBase,Prompt,ReferAudio,VoiceModel
 from app.core.schemas import ChatRequest,SessionItem
 from fastapi.responses import StreamingResponse
@@ -280,10 +284,10 @@ async def start_voice_model_train(
                     "asr_model":  "Faster Whisper (多语种)",
                     "asr_model_size": "large-v3",
                     "asr_lang":   "zh",
-                    "sovits_epoch": 4,
-                    "sovits_save_every": 4,
-                    "gpt_epoch":  10,
-                    "gpt_save_every": 10,
+                    "sovits_epoch": 1,
+                    "sovits_save_every": 1,
+                    "gpt_epoch":  1,
+                    "gpt_save_every": 1,
                     "batch_size": 2,
                     "if_save_latest": True,
                     "if_save_every_weights": False,
@@ -302,7 +306,7 @@ async def start_voice_model_train(
     )
     return {"task_id": task_id, "message": "训练任务已提交"}
 
-@app.get("/voice_models/train/status/{task_id}")   #训练结果需通过8000/voice_models/train/status/{task_id}轮询    
+@app.get("/voice_models/train/status/{task_id}")   #训练结果需通过http://127.0.0.1:8000/voice_models/train/status/{task_id}轮询    
 async def poll_train_status(task_id: str):   
     gsv_base = settings.TRAIN_URL
     try:

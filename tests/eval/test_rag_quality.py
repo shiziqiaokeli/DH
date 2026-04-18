@@ -51,4 +51,4 @@ class TestRAGFaithfulness:
     def test_deepeval_hallucination(self, rag_results, baseline):   #幻觉率
         scores = run_deepeval_eval(rag_results)
         base = baseline.get("deepeval_hallucination", 0)
-        assert scores["deepeval_hallucination"] >= base - THRESHOLD_DROP
+        assert scores["deepeval_hallucination"] <= base + THRESHOLD_DROP

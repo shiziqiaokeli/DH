@@ -1,3 +1,15 @@
+'''本地模型
+conda activate vllm
+python3 -m vllm.entrypoints.openai.api_server \
+    --model /mnt/d/huggingface/Qwen2.5-3B-AWQ \
+    --port 9526 \
+    --quantization awq \
+    --gpu-memory-utilization 0.4 \
+    --max-model-len 4096 \
+    --kv-cache-dtype fp8 \
+    --dtype float16 \
+    --host 0.0.0.0
+'''
 from app.core.config import settings#导入配置文件
 from app.core.custom_embed import CustomQwenEmbeddings#导入自定义向量模型（api）
 from langchain_huggingface import HuggingFaceEmbeddings#导入向量模型（本地）
@@ -8,8 +20,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter#初始化分
 import uuid#生成唯一uuid
 from langchain_chroma import Chroma#初始化向量数据库
 import asyncio#异步核心
-from langchain_openai import ChatOpenAI#初始化大模型（api）
-from langchain_ollama import ChatOllama#初始化大模型（本地）
+from langchain_openai import ChatOpenAI#初始化大模型
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder#导入提示词拼接工具和记忆区模块
 from langchain_community.chat_message_histories import RedisChatMessageHistory#导入Redis会话历史模块
 from langchain_core.documents import Document#导入Document对象
@@ -40,13 +51,13 @@ _reranker_model = HuggingFaceCrossEncoder(   #初始化重排器模型
     model_kwargs={"device": "cuda"},   #有NVIDIA GPU改为"cuda"（GPU吃紧，先用CPU）
 )
 _reranker_model.client.model.half()   #转fp16，显存吃紧
-reranker = CrossEncoderReranker(model=_reranker_model, top_n=8)   #初始化重排器
+reranker = CrossEncoderReranker(model=_reranker_model, top_n=6)   #初始化重排器
 
 async def process_uploaded_file(file_path: str) -> str:   #将上传的文件用向量模型切分并存入到向量数据库
     loader = TextLoader(file_path, encoding="utf-8")   #通过路径和编码方式初始化加载器
     documents = loader.load()   #调用加载器的load方法获取资料
     splitter = RecursiveCharacterTextSplitter(   #初始化分割器
-        chunk_size=200,   #每块包含的最大字符数
+        chunk_size=400,   #每块包含的最大字符数
         chunk_overlap=100,   #相邻两块之间重叠的字符数
         separators=["\n\n", "\n", "。", "！", "？", "；", "，", ",", " ", ""],   #分隔符（控制切分优先级，从左到右依次切分，直到chunk_size<300）
     )
@@ -60,22 +71,25 @@ async def process_uploaded_file(file_path: str) -> str:   #将上传的文件用
     await asyncio.to_thread(db.add_documents, chunks)   #开启一个独立线程等待向量数据库将资料存入，期间CPU可以处理其他请求
     return collection_name   #返回给调用方，写入MySQL
 
-'''
+
 def _make_llm(temperature: float) -> ChatOpenAI:   #初始化大模型（api）
     return ChatOpenAI(
         api_key=settings.LLM_API_KEY,
         base_url=settings.LLM_BASE_URL,
-        model="qwen-plus",
+        model="qwen3.5-flash",
         temperature=temperature,
         streaming=True,
     )
 '''
-def _make_llm(temperature: float) -> ChatOllama:   #初始化大模型（本地）
-    return ChatOllama(
-        model="qwen2.5:3b",
+def _make_llm(temperature: float) -> ChatOpenAI:   #初始化大模型（本地）
+    return ChatOpenAI(
+        api_key="EMPTY",
+        base_url="http://localhost:9526/v1",
+        model="/mnt/d/huggingface/Qwen2.5-3B-AWQ",
         temperature=temperature,
         streaming=True,
     )
+'''
 
 transform_system_prompt=(   #构建转化问题所用的系统提示词
     "给定聊天历史和最新用户问题，"
@@ -118,7 +132,7 @@ def _build_chain(   #构建完整的chain
     bm25_retriever = BM25Retriever.from_documents(bm25_docs, k=20)
     ensemble_retriever = EnsembleRetriever(   #多路融合：RRF（倒数排名融合），权重各0.5
         retrievers=[dense_retriever, bm25_retriever],
-        weights=[0.3, 0.7],
+        weights=[0.4, 0.6],
     )
     compression_retriever = ContextualCompressionRetriever(   #精排：BGE-Reranker压缩到top-5
         base_compressor=reranker,
