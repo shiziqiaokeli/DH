@@ -131,7 +131,7 @@ async def run_rag_batch(   #批量调用RAG链，收集question/answer/contexts/
         await history.aclear()   #清理临时会话
     return results
 '''
-MAX_CONCURRENCY = 1   #Ollama本地推理的安全并发数，根据显存调整
+MAX_CONCURRENCY = 1   #本地推理的安全并发数，根据显存调整
 BATCH_COOLDOWN = 1.0   #每批之间冷却秒数，防止GPU过热/OOM
 
 async def _run_single(   #单条测试用例的推理，受信号量限流
