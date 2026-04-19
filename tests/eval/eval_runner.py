@@ -1,9 +1,8 @@
-#RAG评测流水线（Ragas+DeepEval）
-#首次使用：python -m tests.eval.eval_runner --update-baseline
-#后续使用：python -m tests.eval.eval_runner
-'''
+'''RAG评测流水线Ragas+DeepEval
 $env:HF_HUB_OFFLINE = "1"
 $env:TRANSFORMERS_OFFLINE = "1"
+python -m tests.eval.eval_runner   #后续使用
+python -m tests.eval.eval_runner --update-baseline   #首次使用
 '''
 from pathlib import Path
 from deepeval.models import DeepEvalBaseLLM#自定义裁判LLM
@@ -40,6 +39,7 @@ import sys
 import app.services.rag as rag_module
 import gc
 import torch
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 import json
 
 EVAL_DIR = Path(__file__).parent
@@ -52,6 +52,7 @@ EVAL_QA_PROMPT = (   #评测用的QA系统提示词（与生产一致）
     "若【参考资料】未提及，请回答不知道，不要引用民间传说（如三国演义与三国志的区别）。"
     "【参考资料】：{context}"
 )
+PUSHGATEWAY_URL = os.getenv("PUSHGATEWAY_URL", "http://localhost:9091")
 
 class QwenJudge(DeepEvalBaseLLM):   #将本地Qwen模型包装成裁判LLM
     name = "qwen-plus-2025-07-28"
@@ -70,15 +71,25 @@ class QwenJudge(DeepEvalBaseLLM):   #将本地Qwen模型包装成裁判LLM
     def generate(self, prompt: str, *args, **kwargs) -> str:
         resp = self._client.chat.completions.create(
             model=self.name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "你必须严格输出合法JSON，不要包含```代码块标记，不要在JSON前后添加任何解释文字。"},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0,
+            response_format={"type": "json_object"},   #强制JSON模式
+            max_tokens=4096,   #避免被截断
         )
         return resp.choices[0].message.content
     async def a_generate(self, prompt: str, *args, **kwargs) -> str:
         resp = await self._async_client.chat.completions.create(
             model=self.name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "你必须严格输出合法JSON，不要包含```代码块标记，不要在JSON前后添加任何解释文字。"},
+                {"role": "user", "content": prompt},
+            ],
             temperature=0,
+            response_format={"type": "json_object"},
+            max_tokens=4096,
         )
         return resp.choices[0].message.content
     def get_model_name(self) -> str:
@@ -267,7 +278,7 @@ def run_deepeval_eval(results: list[dict]) -> dict[str, float]:   #使用DeepEva
                 if md.score is not None:
                     ar_scores.append(md.score)
     return {
-        "deepeval_hallucination": sum(hall_scores) / len(hall_scores) if hall_scores else 0.0,   #幻觉率
+        "deepeval_non_hallucination": 1.0 - (sum(hall_scores) / len(hall_scores)) if hall_scores else 1.0,   #非幻觉率
         "deepeval_contextual_precision": sum(cp_scores) / len(cp_scores) if cp_scores else 0.0,   #检索内容精度
         "deepeval_answer_relevancy": sum(ar_scores) / len(ar_scores) if ar_scores else 0.0,   #答案相关性
     }
@@ -324,6 +335,23 @@ async def main():
     deepeval_scores = run_deepeval_eval(results)
     all_scores = {**ragas_scores, **deepeval_scores}   #合并分数
     print_all_scores(all_scores)
+    def push_eval_metrics_to_prometheus(scores: dict[str, float]) -> None:   #把离线评测结果推送到Pushgateway
+        registry = CollectorRegistry()
+        for name, val in scores.items():
+            if name == "threshold_drop":
+                continue
+            g = Gauge(
+                f"llm_eval_{name}",
+                f"离线评测指标 {name}",
+                registry=registry,
+            )
+            g.set(float(val))
+        try:
+            push_to_gateway(PUSHGATEWAY_URL, job="dh_eval", registry=registry)
+            print(f"评测指标已推送到 {PUSHGATEWAY_URL}")
+        except Exception as e:
+            print(f"[WARN] 推送评测指标失败：{e}")
+    push_eval_metrics_to_prometheus(all_scores)
     if update_baseline or not BASELINE_PATH.exists():   #首次运行或强制更新基线
         all_scores["threshold_drop"] = 0.05
         BASELINE_PATH.write_text(

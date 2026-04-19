@@ -1,0 +1,15 @@
+#观测性：OpenTelemetry
+opentelemetry-api>=1.27.0
+opentelemetry-sdk>=1.27.0
+opentelemetry-exporter-otlp-proto-grpc>=1.27.0
+opentelemetry-exporter-prometheus>=0.48b0
+opentelemetry-instrumentation-fastapi>=0.48b0
+opentelemetry-instrumentation-httpx>=0.48b0
+opentelemetry-instrumentation-redis>=0.48b0
+opentelemetry-instrumentation-sqlalchemy>=0.48b0
+opentelemetry-instrumentation-logging>=0.48b0
+#LLM专用：OpenInference（LangChain自动埋点）
+openinference-instrumentation-langchain>=0.1.29
+arize-phoenix-otel>=0.6.0#本地Phoenix，可选
+#Prometheus Push（给eval_runner用）
+prometheus-client>=0.20.0

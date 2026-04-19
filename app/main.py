@@ -1,13 +1,19 @@
 '''
 $env:HF_HUB_OFFLINE = "1"
 $env:TRANSFORMERS_OFFLINE = "1"
+python -m app.main
+cd webui
+npm run dev
 '''
+from contextlib import asynccontextmanager
 from fastapi import FastAPI,HTTPException,UploadFile,File,Form
+from app.observability.otel import init_observability
+from app.db.session import engine
 from app.services.rag import RAGService,get_session_history,process_uploaded_file
 from redis import asyncio as aioredis
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
-from sqlalchemy import false, select
+from sqlalchemy import select
 from app.db.models import SystemSetting,KnowledgeBase,Prompt,ReferAudio,VoiceModel
 from app.core.schemas import ChatRequest,SessionItem
 from fastapi.responses import StreamingResponse
@@ -16,7 +22,12 @@ import tempfile
 import os
 import httpx
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_observability(app, engine=engine)
+    yield  
+
+app = FastAPI(lifespan=lifespan)
 rag_service = RAGService()   
 redis_client = aioredis.from_url(settings.REDIS_URL)
 SESSION_INDEX_KEY = "dh:sessions"   

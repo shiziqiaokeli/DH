@@ -41,14 +41,23 @@ class TestRAGContextQuality:
     def test_ragas_context_recall(self, rag_results, baseline):   #检索召回率
         scores = run_ragas_eval(rag_results)
         base = baseline.get("ragas_context_recall", 0)
-        assert scores["ragas_context_recall"] >= base - THRESHOLD_DROP
+        assert scores["ragas_context_recall"] >= base - THRESHOLD_DROP,(
+            f"上下文召回率下降: {scores['ragas_context_recall']:.4f} "
+            f"< 基线 {base:.4f}"
+        )
 
 class TestRAGFaithfulness:   
     def test_ragas_faithfulness(self, rag_results, baseline):   #忠实度
         scores = run_ragas_eval(rag_results)
         base = baseline.get("ragas_faithfulness", 0)
-        assert scores["ragas_faithfulness"] >= base - THRESHOLD_DROP
-    def test_deepeval_hallucination(self, rag_results, baseline):   #幻觉率
+        assert scores["ragas_faithfulness"] >= base - THRESHOLD_DROP, (
+            f"忠实度下降: {scores['ragas_faithfulness']:.4f} "
+            f"< 基线 {base:.4f}"
+        )
+    def test_deepeval_non_hallucination(self, rag_results, baseline):   #非幻觉率（越高越好）
         scores = run_deepeval_eval(rag_results)
-        base = baseline.get("deepeval_hallucination", 0)
-        assert scores["deepeval_hallucination"] <= base + THRESHOLD_DROP
+        base = baseline.get("deepeval_non_hallucination", 0)
+        assert scores["deepeval_non_hallucination"] >= base - THRESHOLD_DROP, (
+            f"非幻觉率下降: {scores['deepeval_non_hallucination']:.4f} "
+            f"< 基线 {base:.4f}"
+        )

@@ -1,0 +1,66 @@
+groups:
+  - name: dh_llm_ops
+    interval: 30s
+    rules:
+      - alert: LLME2EHighLatency   #端到端p95>8s，持续5分钟 → 有性能问题
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(llm_request_duration_seconds_bucket{stage="e2e"}[5m])) by (le)
+          ) > 8
+        for: 5m
+        labels: { severity: page, category: latency }
+        annotations:
+          summary: "LLM端到端p95延迟飙升"
+
+      - alert: LLMTTFTHigh   #首token>3s → 用户体感卡
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(llm_request_duration_seconds_bucket{stage="ttft"}[5m])) by (le)
+          ) > 3
+        for: 5m
+        labels: { severity: warn, category: ttft }
+
+      - alert: RetrievalSlow   #LangChain retriever span的p95>2s → 是检索的锅
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(traces_spanmetrics_latency_bucket{span_name=~".*Retriever.*"}[5m])) by (le)
+          ) > 2
+        for: 3m
+        labels: { severity: warn, category: retrieval }
+        annotations:
+          description: "向量检索p95>2s，可能是Chroma卡/embedding超时"
+
+      - alert: LLMErrorRateHigh   #错误率>2%
+        expr: |
+          sum(rate(llm_errors_total[5m]))
+          / sum(rate(llm_requests_total[5m])) > 0.02
+        for: 5m
+        labels: { severity: page, category: reliability }
+
+      - alert: LLMOutputLengthDrift   #输出长度均值偏离基线20% → 模型行为漂移
+        expr: |
+          abs(
+            avg_over_time(llm_output_chars_sum[30m])
+            / avg_over_time(llm_output_chars_count[30m])
+            - avg_over_time(llm_output_chars_sum[7d] offset 1d)
+            / avg_over_time(llm_output_chars_count[7d] offset 1d)
+          ) > 0.2 * avg_over_time(llm_output_chars_sum[7d] offset 1d)
+              / avg_over_time(llm_output_chars_count[7d] offset 1d)
+        for: 30m
+        labels: { severity: warn, category: drift }
+        annotations:
+          description: "近30分钟平均输出长度与7天基线偏离>20%，疑似模型drift"
+
+      - alert: NonHallucinationLow
+        expr: llm_eval_deepeval_non_hallucination < 0.85   #非幻觉率低于85%（=幻觉率高于15%）告警
+        for: 0m
+        labels: { severity: page, category: quality }
+        annotations:
+          summary: "非幻觉率低于0.85，疑似质量回归"
+          description: "当前 {{ $value }}，等价幻觉率 > 15%"
+
+      - alert: FaithfulnessDrop   #离线评测：忠实度比7天前降了5%
+        expr: |
+          llm_eval_ragas_faithfulness
+          < (llm_eval_ragas_faithfulness offset 7d) - 0.05
+        labels: { severity: warn, category: quality }

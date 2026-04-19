@@ -1,0 +1,11 @@
+route:
+  receiver: "default"   #所有告警先走默认接收器
+  group_by: ["alertname", "category"]   #按告警名+类别分组合并
+  group_wait: 30s   #首次分组等待，攒一波再发
+  group_interval: 5m   #同组下次发送间隔
+  repeat_interval: 4h   #未恢复时的重复提醒间隔
+
+receivers:
+  - name: "default"   #占位接收器，先不发任何外部通知
+    # webhook_configs:
+    #   - url: "http://host.docker.internal:5001/webhook"   #本地调试用
