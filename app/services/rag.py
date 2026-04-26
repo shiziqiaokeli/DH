@@ -1,7 +1,7 @@
 '''本地模型
 conda activate vllm
 python3 -m vllm.entrypoints.openai.api_server \
-    --model /mnt/d/huggingface/Qwen2.5-3B-AWQ \
+    --model Qwen/Qwen2.5-3B-Instruct-AWQ \
     --port 9526 \
     --quantization awq \
     --gpu-memory-utilization 0.4 \

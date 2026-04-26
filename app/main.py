@@ -1,9 +1,14 @@
 '''
 $env:HF_HUB_OFFLINE = "1"
 $env:TRANSFORMERS_OFFLINE = "1"
+docker compose up -d
 python -m app.main
 cd webui
 npm run dev
+docker ps   #查看容器运行状态
+docker compose stop   #保留容器，保留数据卷
+docker compose down   #删除容器，保留数据卷
+docker compose down -v   #删除容器，删除数据卷
 '''
 from contextlib import asynccontextmanager
 from fastapi import FastAPI,HTTPException,UploadFile,File,Form

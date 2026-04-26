@@ -1,13 +1,12 @@
-version: "3.9"
 services:
   phoenix:   #Arize Phoenix：Trace查看+LLM专用UI（支持OTLP）
-    image: arizephoenix/phoenix:latest
+    image: arizephoenix/phoenix:14.10.0
     ports: ["6006:6006", "4317:4317"]
     environment:
       - PHOENIX_GRPC_PORT=4317
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.11.2
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -15,17 +14,17 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
 
   pushgateway:   #离线评测指标推送目标
-    image: prom/pushgateway:latest
+    image: prom/pushgateway:v1.11.2
     ports: ["9091:9091"]
 
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.29.0
     volumes:
       - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports: ["9093:9093"]
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.4.3
     ports: ["3000:3000"]
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin

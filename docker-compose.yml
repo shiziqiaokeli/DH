@@ -1,0 +1,25 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: dh-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 225823
+      MYSQL_DATABASE: dh
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - dh_mysql_data:/var/lib/mysql
+  redis:
+    image: redis:7.4.8
+    container_name: dh-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - dh_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+volumes:
+  dh_mysql_data:
+  dh_redis_data:
